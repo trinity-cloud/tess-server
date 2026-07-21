@@ -1,5 +1,16 @@
 # Tess Server
 
+```text
+    ╷ ╷ ╷ ╷ ╷ ╷
+  ┌─┴─┴─┴─┴─┴─┴─┐
+ ─┤             ├─
+ ─┤   T E S S   ├─
+ ─┤ S E R V E R ├─
+ ─┤             ├─
+  └─┬─┬─┬─┬─┬─┬─┘
+    ╵ ╵ ╵ ╵ ╵ ╵
+```
+
 **Run frontier-scale open models locally on Apple Silicon.**
 
 Tess Server is a guided terminal application for discovering, configuring, verifying, and serving large GGUF models on your Mac. It combines an open-source TypeScript/Ink interface with the proprietary Tess Server engine and exposes an OpenAI-compatible API for Tess and other local clients.
@@ -15,6 +26,16 @@ tess-server
 ```
 
 The TUI searches common model folders on internal and attached storage. Select a supported model, choose a context window, verify the files, and press `s` to start the server.
+
+The Silicon mark is the default launch identity. To preview the other terminal treatments:
+
+```bash
+tess-server --logo big-iron
+tess-server --logo calvin
+tess-server --logo mini
+tess-server --logo classic
+tess-server --logo stream
+```
 
 Model weights are not bundled. You must obtain and store GGUF files under their respective licenses.
 
@@ -148,6 +169,7 @@ Tess Server is built on the MIT-licensed [llama.cpp](https://github.com/ggml-org
 - [Supported models](docs/models.md)
 - [Running Tess Server](docs/running.md)
 - [Performance and methodology](docs/performance.md)
+- [Brand marks](docs/branding.md)
 
 ---
 

@@ -1,3 +1,5 @@
+import {isLogoVariant, type LogoVariant} from './branding.js';
+
 export type CommandName = 'tui' | 'profiles' | 'models' | 'doctor' | 'verify' | 'serve' | 'engine' | 'help';
 
 export interface CliOptions {
@@ -7,6 +9,7 @@ export interface CliOptions {
   model?: string;
   draft?: string;
   context?: number;
+  logo: LogoVariant;
   port?: number;
   alias?: string;
   apiKeyFile?: string;
@@ -41,7 +44,7 @@ function boundedNumber(name: string, value: string, minimum: number, maximum: nu
 }
 
 export function parseCliArgs(argv: string[]): CliOptions {
-  const options: CliOptions = {command: 'tui', modelRoots: [], noAuth: false, printConfig: false, json: false, version: false, engineArgs: []};
+  const options: CliOptions = {command: 'tui', modelRoots: [], logo: 'silicon', noAuth: false, printConfig: false, json: false, version: false, engineArgs: []};
   let index = 0;
   if (argv[0] && !argv[0].startsWith('-') && commands.has(argv[0] as CommandName)) {
     options.command = argv[0] as CommandName;
@@ -69,6 +72,12 @@ export function parseCliArgs(argv: string[]): CliOptions {
       case '--model': options.model = takeValue(argument); break;
       case '--draft': options.draft = takeValue(argument); break;
       case '--context': options.context = positiveInteger(argument, takeValue(argument)); break;
+      case '--logo': {
+        const value = takeValue(argument);
+        if (!isLogoVariant(value)) throw new Error('--logo must be silicon, big-iron, calvin, mini, classic, or stream');
+        options.logo = value;
+        break;
+      }
       case '--port': {
         const port = positiveInteger(argument, takeValue(argument));
         if (port > 65535) {
