@@ -1,0 +1,77 @@
+{
+  "profile_id": "nemotron3-super-q4km",
+  "schema_version": 2,
+  "engine": {
+    "min_version": "0.1.0-rc.2",
+    "max_version": null
+  },
+  "model": {
+    "name": "NVIDIA-Nemotron-3-Super-120B-A12B",
+    "architecture": "nemotron3-hybrid-mamba2-moe",
+    "quant_label": "UD-Q4_K_M",
+    "total_params": "120.67B",
+    "active_params": "12B"
+  },
+  "shards": [
+    {
+      "name": "NVIDIA-Nemotron-3-Super-120B-A12B-UD-Q4_K_M-00001-of-00003.gguf",
+      "bytes": 7872576,
+      "sha256": "f22083eb6b15acb52905308ab083e8b0cc38897005cc45e8881abd164580aac2"
+    },
+    {
+      "name": "NVIDIA-Nemotron-3-Super-120B-A12B-UD-Q4_K_M-00002-of-00003.gguf",
+      "bytes": 49932117344,
+      "sha256": "6d65adda88759f1bcea714e4da09dab8ecc42265a57b87f9bf7fe3cb7f53b889"
+    },
+    {
+      "name": "NVIDIA-Nemotron-3-Super-120B-A12B-UD-Q4_K_M-00003-of-00003.gguf",
+      "bytes": 32601178560,
+      "sha256": "2b126c51396dd31fbb1273fb2b28d0c8502bab5e357a852f67af7a4b6f5ba79c"
+    }
+  ],
+  "draft": null,
+  "context": {
+    "trained": 1048576,
+    "engine_allocatable": 1048576,
+    "validated": 32768,
+    "qualified": 32768,
+    "validated_prompt": 32256,
+    "validated_generation": 256,
+    "default": 32768
+  },
+  "runtime": {
+    "batch": 2048,
+    "ubatch": 2048,
+    "kv_type": "f16",
+    "slots": 1,
+    "flash_attention": true,
+    "jinja": true
+  },
+  "speculation": null,
+  "memory": {
+    "ram_class_gib": 128,
+    "wired_limit_note": null
+  },
+  "evidence": [
+    "release-qualification-2026-07-21",
+    "context-qualification-2026-07"
+  ],
+  "limitations": [
+    "Validated serving depth: 32,256 prompt + 256 generated tokens; deeper contexts are best-effort."
+  ],
+  "expert": {
+    "context_presets": [
+      {"tokens": 32768, "label": "32K", "group": "Native", "recommended": true, "batch": 2048, "ubatch": 2048},
+      {"tokens": 65536, "label": "64K", "group": "Native", "batch": 2048, "ubatch": 2048},
+      {"tokens": 131072, "label": "128K", "group": "Native", "batch": 2048, "ubatch": 2048},
+      {"tokens": 262144, "label": "256K", "group": "Native", "batch": 2048, "ubatch": 2048},
+      {"tokens": 524288, "label": "512K", "group": "Native", "experimental": true, "batch": 2048, "ubatch": 2048},
+      {"tokens": 1048576, "label": "1M", "group": "Native", "experimental": true, "batch": 2048, "ubatch": 2048}
+    ],
+    "reasoning": {
+      "default": "full",
+      "options": ["full", "low", "off"],
+      "preserve_default": false
+    }
+  }
+}

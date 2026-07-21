@@ -1,0 +1,82 @@
+{
+  "profile_id": "hy3-iq2m",
+  "schema_version": 2,
+  "engine": {
+    "min_version": "0.1.0-rc.2",
+    "max_version": null
+  },
+  "model": {
+    "name": "Tencent Hy3",
+    "architecture": "hy3",
+    "quant_label": "IQ2_M",
+    "total_params": "298.8B",
+    "active_params": null
+  },
+  "shards": [
+    {
+      "name": "Hy3-IQ2_M-00001-of-00003.gguf",
+      "bytes": 47675601920,
+      "sha256": "c97a9c771f8b4b1d323d3b0d8606f2cbcf5177391096d51602bb813a254c4de2"
+    },
+    {
+      "name": "Hy3-IQ2_M-00002-of-00003.gguf",
+      "bytes": 47954769440,
+      "sha256": "1044e862e6f50d906c641176d75dec2169d437b69b41c362c73ed7eb39f20046"
+    },
+    {
+      "name": "Hy3-IQ2_M-00003-of-00003.gguf",
+      "bytes": 4378463456,
+      "sha256": "8129c7ee1134a850c97b63391faf9ed0cb9ff6d6d2b950ac6cf5fdad650a4182"
+    }
+  ],
+  "draft": null,
+  "context": {
+    "trained": 262144,
+    "engine_allocatable": 65536,
+    "validated": 32768,
+    "qualified": 32768,
+    "validated_prompt": 32256,
+    "validated_generation": 256,
+    "default": 32768
+  },
+  "runtime": {
+    "batch": 8192,
+    "ubatch": 8192,
+    "kv_type": "f16",
+    "slots": 1,
+    "flash_attention": true,
+    "jinja": true
+  },
+  "speculation": {
+    "type": "draft-mtp",
+    "n_max": 1,
+    "p_min": 0.7,
+    "invariants": [
+      "single-slot",
+      "profile-owned-verification-policy"
+    ]
+  },
+  "memory": {
+    "ram_class_gib": 128,
+    "requires_wired_limit_mb": 129024,
+    "wired_limit_note": "The 32K release profile was validated with iogpu.wired_limit_mb=129024. Set it manually once per boot before launch; Tess Server never requests root or changes the limit."
+  },
+  "evidence": [
+    "release-qualification-2026-07-21",
+    "context-qualification-2026-07"
+  ],
+  "limitations": [
+    "Not loadable by stock llama.cpp; architecture support lives in the Tess engine.",
+    "8 of 192 experts active per token; active-parameter count not published.",
+    "Verified launches require the profile-owned execution policy; unmodeled tuning overrides are rejected."
+  ],
+  "expert": {
+    "context_presets": [
+      {"tokens": 8192, "label": "8K", "group": "Native", "batch": 8192, "ubatch": 8192, "requires_wired_limit_mb": 129024},
+      {"tokens": 16384, "label": "16K", "group": "Native", "batch": 8192, "ubatch": 8192, "requires_wired_limit_mb": 129024},
+      {"tokens": 32768, "label": "32K", "group": "Native", "recommended": true, "batch": 8192, "ubatch": 8192, "requires_wired_limit_mb": 129024},
+      {"tokens": 49152, "label": "48K", "group": "Native", "batch": 8192, "ubatch": 512, "requires_wired_limit_mb": 129024},
+      {"tokens": 65536, "label": "64K", "group": "Native", "experimental": true, "batch": 8192, "ubatch": 512, "requires_wired_limit_mb": 129024}
+    ]
+  }
+}

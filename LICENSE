@@ -1,0 +1,17 @@
+# Tess Server distribution license notice
+
+Tess Server is a mixed-license distribution. Different files are governed by different terms.
+
+## Open-source TUI
+
+The TypeScript/Ink TUI and its associated npm build, test, packaging, and documentation source are licensed under the MIT License in `LICENSE-TUI.md`. This includes `src/`, compiled `build/` output, `package.json`, `package-lock.json`, `tsconfig.json`, and the npm-focused `.mjs` scripts.
+
+## Proprietary engine sidecar
+
+The generated `sidecar/darwin-arm64/` payload is governed by the Tess Server Engine License Agreement in `LICENSE.md`, except for third-party components identified in `THIRD_PARTY_NOTICES.md` and their accompanying license texts. The proprietary payload includes the Tess Server executable, compiled Metal library, model profiles, verification and launch scripts, manifests, and provenance material.
+
+## Third-party software and model weights
+
+Third-party software remains governed by its own license. Nothing in the Tess Server Engine License Agreement reduces rights granted by those licenses. Model weights are not part of Tess Server and remain governed by their respective licenses.
+
+Where these terms conflict, the license identified for the specific component controls.

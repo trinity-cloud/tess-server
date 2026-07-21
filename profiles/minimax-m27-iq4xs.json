@@ -1,0 +1,87 @@
+{
+  "profile_id": "minimax-m27-iq4xs",
+  "schema_version": 2,
+  "engine": {
+    "min_version": "0.1.0-rc.2",
+    "max_version": null
+  },
+  "model": {
+    "name": "MiniMax-M2.7",
+    "architecture": "minimax-m2",
+    "quant_label": "UD-IQ4_XS",
+    "total_params": "230B",
+    "active_params": "10B"
+  },
+  "shards": [
+    {
+      "name": "MiniMax-M2.7-UD-IQ4_XS-00001-of-00004.gguf",
+      "bytes": 8237824,
+      "sha256": "f2cec86cffaac2ce97195268f22c63f77c28390a3c699086de0e9828c5307cfe"
+    },
+    {
+      "name": "MiniMax-M2.7-UD-IQ4_XS-00002-of-00004.gguf",
+      "bytes": 49638761280,
+      "sha256": "484f7cf194ec4d78527b3681cad459109cf3764470d5a01415704fac8383a006"
+    },
+    {
+      "name": "MiniMax-M2.7-UD-IQ4_XS-00003-of-00004.gguf",
+      "bytes": 49598675552,
+      "sha256": "0d8015d0398c7425b68c62e6bea1ba8c6a99c2ebc376b6e1cc2441bc95309197"
+    },
+    {
+      "name": "MiniMax-M2.7-UD-IQ4_XS-00004-of-00004.gguf",
+      "bytes": 9168106656,
+      "sha256": "4b567fec7084d4c9ca4ae7892630125e1b925e87b56d0509ff3bc8f7e49996f9"
+    }
+  ],
+  "draft": null,
+  "context": {
+    "trained": 196608,
+    "engine_allocatable": 196608,
+    "validated": 196608,
+    "qualified": 196608,
+    "validated_prompt": 195306,
+    "default": 71680
+  },
+  "runtime": {
+    "batch": 2048,
+    "ubatch": 2048,
+    "kv_type": "q4_0",
+    "slots": 1,
+    "flash_attention": true,
+    "jinja": true
+  },
+  "speculation": null,
+  "memory": {
+    "ram_class_gib": 128,
+    "requires_wired_limit_mb": 129024,
+    "wired_limit_note": "Full 196,608 context requires iogpu.wired_limit_mb=129024 once per boot; default context fits without it."
+  },
+  "evidence": [
+    "release-qualification-2026-07-21",
+    "full-context-qualification-2026-07"
+  ],
+  "limitations": [
+    "Decode at 195k depth is ~6.6 t/s (full-context proof conditions).",
+    "Verified launches use the profile-owned cache mode."
+  ],
+  "expert": {
+    "context_presets": [
+      {"tokens": 32768, "label": "32K", "group": "Native", "ubatch": 2048},
+      {"tokens": 65536, "label": "64K", "group": "Native", "ubatch": 2048},
+      {"tokens": 71680, "label": "70K", "group": "Native", "recommended": true, "ubatch": 2048},
+      {"tokens": 98304, "label": "96K", "group": "Native", "ubatch": 2048, "requires_wired_limit_mb": 129024},
+      {"tokens": 131072, "label": "128K", "group": "Native", "ubatch": 2048, "requires_wired_limit_mb": 129024},
+      {"tokens": 163840, "label": "160K", "group": "Native", "ubatch": 2048, "requires_wired_limit_mb": 129024},
+      {"tokens": 196608, "label": "192K", "group": "Native", "ubatch": 2048, "requires_wired_limit_mb": 129024}
+    ],
+    "kv_quality": {
+      "default": "efficient",
+      "options": [
+        {"id": "efficient", "label": "Efficient · Q4_0 K/V", "launcher_value": "q4_0"},
+        {"id": "balanced", "label": "Balanced · Q5_1 K/V", "launcher_value": "q5_1", "max_context": 131072, "availability": "qualification-pending", "unavailable_reason": "Balanced KV identity and memory qualification is pending"},
+        {"id": "high", "label": "High · Q8_0 K/V", "launcher_value": "q8_0", "max_context": 65536, "availability": "qualification-pending", "unavailable_reason": "High KV identity and memory qualification is pending"}
+      ]
+    }
+  }
+}

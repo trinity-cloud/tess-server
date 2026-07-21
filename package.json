@@ -1,0 +1,53 @@
+{
+  "name": "@trinity-cloud/tess-server",
+  "version": "0.1.0-rc.2",
+  "description": "Interactive local model launcher and proprietary Tess Server engine for Apple Silicon",
+  "author": "Trinity Cloud, Inc.",
+  "type": "module",
+  "bin": {
+    "tess-server": "build/cli.js"
+  },
+  "files": [
+    "build/",
+    "!build/tests/",
+    "src/",
+    "!src/tests/",
+    "sidecar/darwin-arm64/",
+    "README.md",
+    "LICENSE",
+    "LICENSE-TUI.md",
+    "LICENSE.md",
+    "THIRD_PARTY_NOTICES.md",
+    "licenses/"
+  ],
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "license": "SEE LICENSE IN LICENSE",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node scripts/build-tui.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "node scripts/test-tui.mjs",
+    "sidecar:stage": "node scripts/stage-npm-sidecar.mjs",
+    "sidecar:verify": "node scripts/verify-npm-sidecar.mjs",
+    "prepack": "node scripts/prepack-npm.mjs"
+  },
+  "dependencies": {
+    "ink": "7.0.2",
+    "react": "19.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "24.10.1",
+    "@types/react": "19.2.0",
+    "typescript": "7.0.2"
+  }
+}

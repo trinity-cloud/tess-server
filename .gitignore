@@ -1,0 +1,23 @@
+# Binaries and release artifacts never live in the git tree.
+# They ship as signed assets attached to tagged GitHub Releases.
+/dist/
+tess-server
+llama-server
+*.metallib
+*.tar.gz
+*.pkg
+*.dmg
+*.zip
+*.dSYM/
+notary-*.json
+# npm/Ink build products and the proprietary generated sidecar.
+node_modules/
+build/
+sidecar/
+*.tgz
+# Models never enter this repo.
+*.gguf
+*.safetensors
+# Local noise
+.DS_Store
+*.log

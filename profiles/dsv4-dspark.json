@@ -1,0 +1,103 @@
+{
+  "profile_id": "dsv4-dspark",
+  "schema_version": 2,
+  "engine": {
+    "min_version": "0.1.0-rc.2",
+    "max_version": null
+  },
+  "model": {
+    "name": "DeepSeek-V4-Flash",
+    "architecture": "deepseek4",
+    "quant_label": "UD-IQ3_XXS",
+    "total_params": "284B",
+    "active_params": "13B"
+  },
+  "shards": [
+    {
+      "name": "DeepSeek-V4-Flash-UD-IQ3_XXS-00001-of-00004.gguf",
+      "bytes": 5256864,
+      "sha256": "efd54820d4124b88383e081504e480e8057ed1c20009f2002cd28884af658cd0"
+    },
+    {
+      "name": "DeepSeek-V4-Flash-UD-IQ3_XXS-00002-of-00004.gguf",
+      "bytes": 49485728288,
+      "sha256": "76c77826a6efe13a2cbe79e95973a3c7fc55f1de8b2fd235d7fa2d935b76f8fa"
+    },
+    {
+      "name": "DeepSeek-V4-Flash-UD-IQ3_XXS-00003-of-00004.gguf",
+      "bytes": 49437886752,
+      "sha256": "bf5d5bfa9cf38334b98085249cfa11d29d3875607d34a6e82dadfa739f3f0e62"
+    },
+    {
+      "name": "DeepSeek-V4-Flash-UD-IQ3_XXS-00004-of-00004.gguf",
+      "bytes": 4071015712,
+      "sha256": "9eea1aa152d81a689e01a0d3cd25d33b43fa92fe4dc473aa65ba8eaa88234e55"
+    }
+  ],
+  "draft": [
+    {
+      "name": "dspark-draft.gguf",
+      "bytes": 11315885312,
+      "sha256": "dff01b7ee9a1e5caa1b30e7e744d6d261aae12c987cc1a1331696fef44c42444"
+    }
+  ],
+  "context": {
+    "trained": 1048576,
+    "engine_allocatable": 1048576,
+    "validated": 262144,
+    "qualified": 262144,
+    "validated_prompt": 258026,
+    "default": 32768
+  },
+  "runtime": {
+    "batch": 2048,
+    "ubatch": 2048,
+    "kv_type": "dsv4-compressed",
+    "slots": 1,
+    "flash_attention": true,
+    "jinja": true
+  },
+  "speculation": {
+    "type": "draft-dspark",
+    "n_max": 5,
+    "p_min": 0.65,
+    "invariants": [
+      "single-slot"
+    ]
+  },
+  "memory": {
+    "ram_class_gib": 128,
+    "wired_limit_note": "This profile needs ~122 GB of GPU-wired memory; macOS defaults to ~115 GB. On startup shortfall, explain and print exactly: Run `sudo sysctl iogpu.wired_limit_mb=129024` to increase the memory limit (one-time per boot; nothing else changes; no data is affected), then exit safely. The engine never runs the sysctl itself and never runs as root.",
+    "requires_wired_limit_mb": 129024
+  },
+  "evidence": [
+    "release-qualification-2026-07-21",
+    "long-context-qualification-2026-07"
+  ],
+  "limitations": [
+    "512k and 1M contexts remain gated pending additional qualification.",
+    "Contexts above 32,768 use managed ubatch 512; manual ubatch overrides are rejected."
+  ],
+  "expert": {
+    "context_presets": [
+      {"tokens": 4096, "label": "4K", "group": "Native", "ubatch": 2048, "requires_wired_limit_mb": 129024},
+      {"tokens": 8192, "label": "8K", "group": "Native", "ubatch": 2048, "requires_wired_limit_mb": 129024},
+      {"tokens": 16384, "label": "16K", "group": "Native", "ubatch": 2048, "requires_wired_limit_mb": 129024},
+      {"tokens": 32768, "label": "32K", "group": "Native", "recommended": true, "ubatch": 2048, "requires_wired_limit_mb": 129024},
+      {"tokens": 65536, "label": "64K", "group": "Native", "ubatch": 512, "requires_wired_limit_mb": 129024},
+      {"tokens": 131072, "label": "128K", "group": "Native", "ubatch": 512, "requires_wired_limit_mb": 129024},
+      {"tokens": 262144, "label": "256K", "group": "Native", "ubatch": 512, "requires_wired_limit_mb": 129024},
+      {"tokens": 524288, "label": "512K", "group": "Extended", "experimental": true, "availability": "qualification-pending", "unavailable_reason": "512K target-only qualification is pending", "ubatch": 512, "requires_wired_limit_mb": 129024, "speculation": "off"},
+      {"tokens": 1048576, "label": "1M", "group": "Extended", "experimental": true, "availability": "qualification-pending", "unavailable_reason": "1M begins after the 512K target-only gate passes", "ubatch": 512, "requires_wired_limit_mb": 129024, "speculation": "off"}
+    ],
+    "speculation": {
+      "default": "dspark",
+      "options": ["dspark", "off"],
+      "draft_depth_default": 5,
+      "draft_depth_min": 1,
+      "draft_depth_max": 5,
+      "p_min_default": 0.65,
+      "p_min_presets": [0.5, 0.65, 0.8]
+    }
+  }
+}

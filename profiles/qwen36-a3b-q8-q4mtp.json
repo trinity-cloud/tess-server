@@ -1,0 +1,69 @@
+{
+  "profile_id": "qwen36-a3b-q8-q4mtp",
+  "schema_version": 2,
+  "engine": {
+    "min_version": "0.1.0-rc.2",
+    "max_version": null
+  },
+  "model": {
+    "name": "Tess-4-35B-A3B (Qwen3.6-35B-A3B base)",
+    "architecture": "qwen35moe",
+    "quant_label": "Tess Q8/Q4 profile build",
+    "total_params": "35B",
+    "active_params": "3B"
+  },
+  "shards": [
+    {
+      "name": "Tess-4-35B-A3B-Q8_0-MTP-Q4D-Q4H-PV64K.gguf",
+      "bytes": 37742183680,
+      "sha256": "dc36347a3cc0b2e1514082d1ffe7443fae05306f53807a86dc8f25cb6408ddf3"
+    }
+  ],
+  "draft": null,
+  "context": {
+    "trained": 262144,
+    "engine_allocatable": 1010000,
+    "validated": 107000,
+    "qualified": 107000,
+    "validated_prompt": 107000,
+    "default": 131072
+  },
+  "runtime": {
+    "batch": 2048,
+    "ubatch": 2048,
+    "kv_type": "f16",
+    "slots": 1,
+    "flash_attention": true,
+    "jinja": true
+  },
+  "speculation": {
+    "type": "draft-mtp",
+    "n_max": 5,
+    "p_min": 0.7,
+    "invariants": [
+      "single-slot"
+    ]
+  },
+  "memory": {
+    "ram_class_gib": 64,
+    "wired_limit_note": null
+  },
+  "evidence": [
+    "release-qualification-2026-07-21",
+    "long-session-qualification-2026-07"
+  ],
+  "limitations": [
+    "Deepest live-session depth exercised before RC gating: ~107k tokens; full 262,144-token ingest remains a release gate.",
+    "Open near-tie investigation at multi-thousand-token generations under speculation; bit-identity validated at recorded probe lengths."
+  ],
+  "expert": {
+    "context_presets": [
+      {"tokens": 32768, "label": "32K", "group": "Native", "ubatch": 2048},
+      {"tokens": 65536, "label": "64K", "group": "Native", "ubatch": 2048},
+      {"tokens": 131072, "label": "128K", "group": "Native", "recommended": true, "ubatch": 2048},
+      {"tokens": 262144, "label": "256K", "group": "Native", "ubatch": 2048},
+      {"tokens": 524288, "label": "512K", "group": "Extended · YaRN", "experimental": true, "availability": "qualification-pending", "unavailable_reason": "512K YaRN target-only qualification is pending", "ubatch": 2048, "speculation": "off", "rope": {"type": "yarn", "factor": 2, "original_context": 262144}},
+      {"tokens": 1010000, "label": "1M", "group": "Extended · YaRN", "experimental": true, "availability": "qualification-pending", "unavailable_reason": "1M begins after the 512K target-only gate passes", "ubatch": 2048, "speculation": "off", "rope": {"type": "yarn", "factor": 4, "original_context": 262144}}
+    ]
+  }
+}
