@@ -22,13 +22,33 @@ The TUI searches common model folders on internal and attached storage. Press `a
 tess-server --model-root /Volumes/Models --model-root /path/to/another/folder
 ```
 
-Press `r` to rescan. Select a complete model entry and press `enter` to open its details.
+Press `r` to rescan. Results are separated into **Profiled Models** and
+**Unprofiled Models**. Select a complete entry and press `enter` to open its
+details. Unprofiled entries are best-effort and never receive a `VERIFIED` label.
 
 ## Choose a context
 
 Use the left and right arrow keys on model details to select a context window. Press `e` to open any additional profile-owned controls.
 
-The TUI marks the recommended default, experimental choices, and qualification-pending choices. Memory-sensitive values are managed automatically and shown in the effective configuration preview.
+The TUI marks the recommended default, experimental choices, and qualification-pending choices for profiled models. Memory-sensitive values are managed automatically and shown in the effective configuration preview.
+
+For an unprofiled model, press `e` to open **Generic Model Configuration**. It
+starts with a 4K context, 512 batch/ubatch, F16 K/V cache, all GPU layers,
+automatic Flash Attention, one slot, mmap and Jinja enabled, and mlock disabled.
+Nearby projector and draft/MTP files with strong filename matches are selected
+automatically. Common values are available with the arrow keys; press `enter` to
+type an exact numeric value, file path, chat template, or additional engine
+arguments. Press `r` to restore detected defaults.
+
+The screen exposes context, batch/ubatch, independent K/V types, GPU layers,
+Flash Attention, slots, mmap/mlock, Jinja/chat template, reasoning behavior,
+projector, speculation type, draft/MTP model, draft depth, and acceptance
+threshold. Less common llama-server flags may be entered under **extra args**;
+networking, authentication, model paths, and first-class settings remain owned by
+the TUI. Press `p` to inspect the complete effective engine command before start.
+
+The TUI does not know an arbitrary model's trained context or memory envelope.
+All unprofiled selections are best-effort regardless of the chosen values.
 
 If a model requires a larger GPU-wired memory limit, the details screen prints the exact one-time-per-boot command. Run it separately in another terminal, then relaunch Tess Server.
 
@@ -40,7 +60,7 @@ Press `c` on the model list to configure shared server settings:
 - **API model name** — `local-llama-server` by default.
 - **Authentication** — off or file-backed bearer authentication.
 
-Profile launches always bind to `127.0.0.1`. LAN binds, arbitrary response headers, CORS configuration, and TLS termination are outside the verified profile surface.
+Managed TUI launches always bind to `127.0.0.1`. LAN binds, arbitrary response headers, CORS configuration, and TLS termination are outside the managed surface.
 
 For bearer authentication, create a private file containing at least 32 non-whitespace characters and restrict it to your user:
 
@@ -52,7 +72,9 @@ Enter that path in Configure Server. The key value is not copied into TUI settin
 
 ## Verify and start
 
-Press `v` to verify model files without loading the model. Press `s` to verify as needed and start the server.
+For profiled models, press `v` to verify files without loading the model. Press
+`s` to verify as needed and start the server. Unprofiled models have no verification
+action; pressing `s` starts the clearly labeled generic launch directly.
 
 The server dashboard reports startup output, health, endpoint, and shutdown state. Press `q` while the server is running to stop it cleanly.
 
@@ -106,10 +128,10 @@ Reaching the hard context limit can interrupt a response or structured tool call
 
 ## Privacy defaults
 
-- Loopback-only profile endpoints.
+- Loopback-only managed TUI endpoints.
 - No telemetry, cloud fallback, update checks, or model downloads.
 - No prompt or generation logging by Tess Server.
-- Browser UI and built-in agent/tool surfaces disabled for profile launches.
+- Browser UI and built-in agent/tool surfaces disabled for managed TUI launches.
 - Optional bearer authentication backed by a local file.
 
 ## Thermal guidance

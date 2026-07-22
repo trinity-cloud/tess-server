@@ -20,7 +20,7 @@ Memory class describes the qualified hardware tier, not a promise that the model
 
 - **Verified** — the packaged engine, model files, profile, and selected settings match a qualified combination.
 - **Custom** — a recognized profile is running with an operator-selected deviation from its qualified defaults.
-- **Best effort** — the engine was invoked directly with a model that does not match a packaged profile.
+- **Unprofiled / best effort** — the TUI found a primary GGUF that does not match a packaged profile and launched it with conservative generic settings.
 - **Experimental** — the choice is available for testing but is not part of the profile's ordinary qualification claim.
 - **Qualification pending** — the choice is visible but cannot be started through the public profile until its release gates close.
 
@@ -36,9 +36,40 @@ The TUI searches:
 
 Multi-file models must keep all required shards together. If a profile requires an additional companion file, it must also be present. The TUI reports missing files before launch.
 
+Discovery separates results into two sections:
+
+- **Profiled Models** match an exact packaged filename and retain the existing
+  verification and managed-profile workflow.
+- **Unprofiled Models** are other primary GGUF files. Multimodal projectors, MTP
+  models, and draft heads are associated with the primary model instead of being
+  shown as invalid standalone entries. Strong filename matches are preselected;
+  the configuration screen lets you disable or replace them.
+
+An unprofiled launch starts from usable, conservative defaults: 4K context,
+512 batch/ubatch, F16 K/V cache, all GPU layers, automatic Flash Attention, one
+slot, mmap and Jinja enabled, mlock disabled, and model-metadata chat/reasoning
+behavior. Exact companion matches are selected automatically with draft depth 3
+and acceptance threshold 0. Arrow-key presets cover common values, and editable
+fields accept model-specific values such as a 24K context.
+
+The dedicated configuration screen exposes context, batch/ubatch, independent K/V
+cache types, GPU layers, Flash Attention, slots, mmap/mlock, Jinja and chat
+template, reasoning controls, multimodal projector, speculation type, draft/MTP
+model, draft depth, and acceptance threshold. An additional engine-arguments field
+is available for less common llama-server options. It cannot override networking,
+authentication, model paths, or a first-class setting; the preview prints the
+effective engine command before launch.
+
+Tess Server cannot infer that an arbitrary model was trained for the selected
+window or that the machine has enough memory. Unprofiled launches carry no
+compatibility, verification, correctness, or performance claim.
+
 ## File verification
 
 Before the first verified launch, Tess Server checks that the local files match the packaged profile. Replacing or modifying a model causes verification to run again. A mismatch is a startup error rather than a warning.
+
+Unprofiled models do not expose the verification action because Tess Server has no
+expected checksums or qualified configuration for them.
 
 This verification identifies the expected artifact; it does not grant a model license or establish that an untrusted model is safe.
 

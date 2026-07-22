@@ -25,7 +25,9 @@ tess-server doctor
 tess-server
 ```
 
-The TUI searches common model folders on internal and attached storage. Select a supported model, choose a context window, verify the files, and press `s` to start the server.
+The TUI searches common model folders on internal and attached storage. Profiled
+models receive managed, qualified settings; other primary GGUF files appear in a
+separate **Unprofiled Models** section for clearly labeled best-effort launches.
 
 The Silicon chip is Tess Server's primary mark and remains visible throughout
 the TUI.
@@ -34,10 +36,12 @@ Model weights are not bundled. You must obtain and store GGUF files under their 
 
 ## What Tess Server handles
 
-- Discovers supported models under `~/models`, `~/Models`, and `models` or `Models` folders on attached volumes.
+- Discovers profiled and unprofiled GGUF models under `~/models`, `~/Models`, and `models` or `Models` folders on attached volumes.
 - Lets you add any other model folder from the TUI or with `--model-root`.
 - Matches local files to versioned Tess profiles and verifies them before the first profile launch.
 - Offers profile-qualified context windows and clearly labels experimental or qualification-pending choices.
+- Groups nearby projector and draft/MTP artifacts under unprofiled primary models,
+  with detected defaults and a complete generic configuration screen.
 - Manages resource settings that should not be changed casually.
 - Starts and monitors a loopback-only OpenAI-compatible server.
 - Performs clean shutdown from the dashboard so the engine is not left running in the background.
@@ -54,7 +58,10 @@ The current release candidate includes five profiles:
 | **MiniMax-M2.7** | UD-IQ4_XS | 101 GiB | 128 GiB | 70K | 32K, 64K, 70K, 96K, 128K, 160K, 192K |
 | **Tencent Hy3** | IQ2_M | 93.1 GiB | 128 GiB | 32K | 8K, 16K, 32K, 48K; experimental 64K |
 
-Profile support is exact-file specific. Generic GGUF files can still be passed directly to the engine, but they do not carry a verified-profile claim.
+Profile support is exact-file specific. Other primary GGUF files are shown as
+**Unprofiled**, use conservative generic defaults, and carry no compatibility,
+verification, memory, correctness, or performance claim. Direct engine invocation
+remains available as the unrestricted expert escape hatch.
 
 See [Supported models](docs/models.md) for context and memory guidance.
 
