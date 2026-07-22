@@ -7,7 +7,7 @@ const profile = {
   profile_id: 'qwen36-a3b-q8-q4mtp',
   context: {default: 262144},
 } as ProfileDescriptor;
-const candidate: ModelCandidate = {profile, modelPath: '/Volumes/models/tess.gguf', complete: true, issues: []};
+const candidate: ModelCandidate = {kind: 'profiled', profile, modelPath: '/Volumes/models/tess.gguf', complete: true, issues: []};
 
 test('builds a packaged verified launcher spec', () => {
   const spec = serveSpec('/payload', candidate, {context: 32768, port: 9000, apiKeyFile: '/keys/local.key', reasoning: 'low'});
@@ -23,4 +23,41 @@ test('builds a packaged verified launcher spec', () => {
 test('builds a profile verifier spec', () => {
   const spec = verifySpec('/payload', candidate);
   assert.deepEqual(spec.args, ['/payload/scripts/verify-profile.sh', 'qwen36-a3b-q8-q4mtp', candidate.modelPath]);
+});
+
+test('builds a configurable generic GGUF launcher with detected companions', () => {
+  const genericProfile = {
+    ...profile,
+    profile_id: 'unprofiled:/Volumes/models/generic.gguf',
+    context: {default: 4096},
+    runtime: {batch: 512, ubatch: 512},
+    expert: {context_presets: [{tokens: 4096, label: '4K', batch: 512, ubatch: 512}]},
+  } as ProfileDescriptor;
+  const generic: ModelCandidate = {
+    kind: 'unprofiled', profile: genericProfile, modelPath: '/Volumes/models/generic.gguf', complete: true, issues: [],
+    companions: {
+      mmproj: ['/Volumes/models/mmproj-generic.gguf'], draft: ['/Volumes/models/mtp-generic.gguf'],
+      recommendedMmproj: '/Volumes/models/mmproj-generic.gguf', recommendedDraft: '/Volumes/models/mtp-generic.gguf', recommendedSpeculation: 'draft-mtp',
+    },
+  };
+  const spec = serveSpec('/payload', generic, {context: 4096, port: 9000, alias: 'local-model', apiKeyFile: '/keys/local.key', rawEngineArgs: '--threads 12'});
+  assert.equal(spec.command, '/payload/bin/tess-server');
+  assert.deepEqual(spec.args.slice(0, 2), ['--threads', '12']);
+  const valueFor = (option: string): string | undefined => spec.args[spec.args.indexOf(option) + 1];
+  assert.equal(valueFor('-m'), generic.modelPath);
+  assert.equal(valueFor('-c'), '4096');
+  assert.equal(valueFor('-b'), '512');
+  assert.equal(valueFor('-ub'), '512');
+  assert.equal(valueFor('-ctk'), 'f16');
+  assert.equal(valueFor('-ctv'), 'f16');
+  assert.equal(valueFor('-ngl'), 'all');
+  assert.equal(valueFor('-fa'), 'auto');
+  assert.equal(valueFor('-np'), '1');
+  assert.equal(valueFor('-mm'), '/Volumes/models/mmproj-generic.gguf');
+  assert.equal(valueFor('--spec-type'), 'draft-mtp');
+  assert.equal(valueFor('-md'), '/Volumes/models/mtp-generic.gguf');
+  assert.equal(valueFor('--spec-draft-n-max'), '3');
+  assert.equal(valueFor('--spec-draft-p-min'), '0');
+  assert.deepEqual(spec.args.slice(-8), ['--alias', 'local-model', '--host', '127.0.0.1', '--port', '9000', '--api-key-file', '/keys/local.key']);
+  assert.throws(() => verifySpec('/payload', generic), /do not have a Tess verification manifest/);
 });

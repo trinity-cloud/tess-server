@@ -25,11 +25,74 @@ test('discovers exact profile filenames recursively and checks sizes', async () 
     await writeFile(join(nested, 'fixture.gguf'), '123456');
     const candidates = await discoverModels([fixtureProfile], [root]);
     assert.equal(candidates.length, 1);
+    assert.equal(candidates[0]?.kind, 'profiled');
     assert.equal(candidates[0]?.complete, true);
     await writeFile(join(nested, 'fixture.gguf'), 'short');
     const mismatched = await discoverModels([fixtureProfile], [root]);
     assert.equal(mismatched[0]?.complete, false);
     assert.match(mismatched[0]?.issues[0] ?? '', /expected 6/);
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
+});
+
+test('discovers unmatched GGUF files as unprofiled best-effort candidates', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'tess-discovery-generic-test.'));
+  try {
+    const directory = join(root, 'models', 'tess');
+    await mkdir(directory, {recursive: true});
+    const path = join(directory, 'Tess-4-27B-Q4_K_M.gguf');
+    await writeFile(path, 'generic-model');
+    const mmprojPath = join(directory, 'mmproj-Tess-4-27B-F16.gguf');
+    const mtpPath = join(directory, 'mtp-Tess-4-27B-Q4_K_M.gguf');
+    const draftHeadPath = join(directory, 'tess-draft-head-Q4_0.gguf');
+    await writeFile(mmprojPath, 'projector');
+    await writeFile(mtpPath, 'draft');
+    await writeFile(draftHeadPath, 'head');
+    const candidates = await discoverModels([fixtureProfile], [root]);
+    assert.equal(candidates.length, 1);
+    assert.equal(candidates[0]?.kind, 'unprofiled');
+    assert.equal(candidates[0]?.profile.model.name, 'Tess-4-27B-Q4_K_M');
+    assert.equal(candidates[0]?.profile.model.quant_label, 'Generic GGUF');
+    assert.equal(candidates[0]?.modelPath, await realpath(path));
+    assert.equal(candidates[0]?.complete, true);
+    assert.deepEqual(candidates[0]?.companions?.mmproj, [await realpath(mmprojPath)]);
+    assert.deepEqual(candidates[0]?.companions?.draft, [await realpath(mtpPath), await realpath(draftHeadPath)]);
+    assert.equal(candidates[0]?.companions?.recommendedMmproj, await realpath(mmprojPath));
+    assert.equal(candidates[0]?.companions?.recommendedDraft, await realpath(mtpPath));
+    assert.equal(candidates[0]?.companions?.recommendedSpeculation, 'draft-mtp');
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
+});
+
+test('shows one unprofiled entry for a sharded GGUF collection and reports missing shards', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'tess-discovery-generic-shards-test.'));
+  try {
+    await writeFile(join(root, 'model-00001-of-00003.gguf'), 'first');
+    await writeFile(join(root, 'model-00002-of-00003.gguf'), 'second');
+    const candidates = await discoverModels([], [root]);
+    assert.equal(candidates.length, 1);
+    assert.equal(candidates[0]?.kind, 'unprofiled');
+    assert.equal(candidates[0]?.profile.model.name, 'model');
+    assert.equal(candidates[0]?.complete, false);
+    assert.deepEqual(candidates[0]?.issues, ['missing model-00003-of-00003.gguf']);
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
+});
+
+test('matches an MTP companion to a primary model carrying a base suffix', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'tess-discovery-base-companion-test.'));
+  try {
+    const modelPath = join(root, 'Qwen3.6-35B-A3B-base.gguf');
+    const draftPath = join(root, 'mtp-Qwen3.6-35B-A3B-Q4_0.gguf');
+    await writeFile(modelPath, 'model');
+    await writeFile(draftPath, 'draft');
+    const candidates = await discoverModels([], [root]);
+    assert.equal(candidates.length, 1);
+    assert.equal(candidates[0]?.companions?.recommendedDraft, await realpath(draftPath));
+    assert.equal(candidates[0]?.companions?.recommendedSpeculation, 'draft-mtp');
   } finally {
     await rm(root, {recursive: true, force: true});
   }

@@ -1,5 +1,6 @@
 import {spawn, type ChildProcess} from 'node:child_process';
 import {join} from 'node:path';
+import {resolveUnprofiledConfiguration} from './configuration.js';
 import {launcherForProfile} from './profiles.js';
 import type {LaunchOverrides, ModelCandidate, ProcessSpec, ProfileDescriptor} from './types.js';
 
@@ -24,6 +25,47 @@ function launchEnvironment(payloadRoot: string, candidate: ModelCandidate, overr
 }
 
 export function serveSpec(payloadRoot: string, candidate: ModelCandidate, overrides: LaunchOverrides = {}): ProcessSpec {
+  if (candidate.kind === 'unprofiled') {
+    const resolved = resolveUnprofiledConfiguration(candidate, overrides);
+    return {
+      command: join(payloadRoot, 'bin', 'tess-server'),
+      args: [
+        ...(resolved.extraArgs ?? []),
+        '-m', candidate.modelPath,
+        '-c', String(resolved.context),
+        '-b', String(resolved.batch),
+        '-ub', String(resolved.ubatch),
+        '-ctk', resolved.cacheTypeK ?? 'f16',
+        '-ctv', resolved.cacheTypeV ?? 'f16',
+        '-ngl', resolved.gpuLayers ?? 'all',
+        '-fa', resolved.flashAttention ?? 'auto',
+        '-np', String(resolved.slots ?? 1),
+        resolved.mmap === false ? '--no-mmap' : '--mmap',
+        ...(resolved.mlock ? ['--mlock'] : []),
+        resolved.jinja === false ? '--no-jinja' : '--jinja',
+        ...(resolved.chatTemplate ? ['--chat-template', resolved.chatTemplate] : []),
+        '--reasoning', resolved.genericReasoning ?? 'auto',
+        '--reasoning-format', resolved.reasoningFormat ?? 'auto',
+        '--reasoning-budget', String(resolved.reasoningBudget ?? -1),
+        ...(resolved.reasoningPreserve === 'on' ? ['--reasoning-preserve'] : resolved.reasoningPreserve === 'off' ? ['--no-reasoning-preserve'] : []),
+        ...(resolved.mmproj ? ['-mm', resolved.mmproj] : ['--no-mmproj']),
+        '--spec-type', resolved.speculationType ?? 'none',
+        ...((resolved.speculationType ?? 'none') !== 'none' && resolved.draftModel ? ['-md', resolved.draftModel] : []),
+        ...((resolved.speculationType ?? 'none') !== 'none' ? ['--spec-draft-n-max', String(resolved.draftDepth ?? 3), '--spec-draft-p-min', String(resolved.pMin ?? 0)] : []),
+        '--metrics',
+        '--slots',
+        '--no-webui',
+        '--no-ui-mcp-proxy',
+        '--no-agent',
+        '--alias', overrides.alias ?? 'local-llama-server',
+        '--host', '127.0.0.1',
+        '--port', String(overrides.port ?? 8787),
+        ...(overrides.apiKeyFile ? ['--api-key-file', overrides.apiKeyFile] : []),
+      ],
+      cwd: payloadRoot,
+      env: {...process.env},
+    };
+  }
   return {
     command: '/bin/bash',
     args: [join(payloadRoot, 'scripts', 'serve', launcherForProfile(candidate.profile.profile_id))],
@@ -33,6 +75,7 @@ export function serveSpec(payloadRoot: string, candidate: ModelCandidate, overri
 }
 
 export function verifySpec(payloadRoot: string, candidate: ModelCandidate): ProcessSpec {
+  if (candidate.kind !== 'profiled') throw new Error('unprofiled models do not have a Tess verification manifest');
   return {
     command: '/bin/bash',
     args: [

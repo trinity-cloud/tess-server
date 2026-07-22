@@ -119,15 +119,49 @@ export interface ProfileDescriptor {
 }
 
 export interface ModelCandidate {
+  kind: 'profiled' | 'unprofiled';
   profile: ProfileDescriptor;
   modelPath: string;
   draftPath?: string;
+  companions?: {
+    mmproj: string[];
+    draft: string[];
+    recommendedMmproj?: string;
+    recommendedDraft?: string;
+    recommendedSpeculation?: GenericSpeculationType;
+  };
   complete: boolean;
   issues: string[];
 }
 
+export type GenericKvType = 'f32' | 'f16' | 'bf16' | 'q8_0' | 'q4_0' | 'q4_1' | 'iq4_nl' | 'q5_0' | 'q5_1';
+export type GenericFlashAttention = 'auto' | 'on' | 'off';
+export type GenericReasoning = 'auto' | 'on' | 'off';
+export type GenericReasoningFormat = 'auto' | 'none' | 'deepseek' | 'deepseek-legacy';
+export type GenericTriState = 'auto' | 'on' | 'off';
+export type GenericSpeculationType = 'none' | 'draft-simple' | 'draft-eagle3' | 'draft-mtp' | 'draft-dflash';
+
 export interface LaunchOverrides {
   context?: number;
+  batch?: number;
+  ubatch?: number;
+  cacheTypeK?: GenericKvType;
+  cacheTypeV?: GenericKvType;
+  gpuLayers?: string;
+  flashAttention?: GenericFlashAttention;
+  slots?: number;
+  mmap?: boolean;
+  mlock?: boolean;
+  jinja?: boolean;
+  chatTemplate?: string;
+  genericReasoning?: GenericReasoning;
+  reasoningFormat?: GenericReasoningFormat;
+  reasoningBudget?: number;
+  reasoningPreserve?: GenericTriState;
+  mmproj?: string;
+  speculationType?: GenericSpeculationType;
+  draftModel?: string;
+  rawEngineArgs?: string;
   port?: number;
   alias?: string;
   apiKeyFile?: string;
@@ -140,7 +174,7 @@ export interface LaunchOverrides {
   printConfig?: boolean;
 }
 
-export type RuntimeLabel = 'verified' | 'custom' | 'rejected';
+export type RuntimeLabel = 'verified' | 'custom' | 'unprofiled' | 'rejected';
 
 export interface ResolvedProfileConfiguration {
   profileId: string;
@@ -155,6 +189,24 @@ export interface ResolvedProfileConfiguration {
   preserveReasoning?: boolean;
   kvQuality?: string;
   kvType: string;
+  cacheTypeK?: GenericKvType;
+  cacheTypeV?: GenericKvType;
+  gpuLayers?: string;
+  flashAttention?: GenericFlashAttention;
+  slots?: number;
+  mmap?: boolean;
+  mlock?: boolean;
+  jinja?: boolean;
+  chatTemplate?: string;
+  genericReasoning?: GenericReasoning;
+  reasoningFormat?: GenericReasoningFormat;
+  reasoningBudget?: number;
+  reasoningPreserve?: GenericTriState;
+  mmproj?: string;
+  speculationType?: GenericSpeculationType;
+  draftModel?: string;
+  rawEngineArgs?: string;
+  extraArgs?: string[];
   runtimeLabel: RuntimeLabel;
   deltas: string[];
   warnings: string[];

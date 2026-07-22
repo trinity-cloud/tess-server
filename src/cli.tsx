@@ -20,7 +20,7 @@ function printHelp(): void {
 
 Usage:
   tess-server                                      Open the interactive model launcher
-  tess-server models [--model-root PATH]           Discover profile-matched models
+  tess-server models [--model-root PATH]           Discover profiled and unprofiled GGUF models
   tess-server profiles [--json]                    List packaged model profiles
   tess-server verify --profile ID --model PATH     Verify model identity without loading it
   tess-server serve --profile ID --model PATH      Start a verified profile in the foreground
@@ -81,10 +81,10 @@ async function main(): Promise<number> {
     if (options.json) {
       console.log(JSON.stringify(candidates, null, 2));
     } else if (candidates.length === 0) {
-      console.log(`No profile-matched models found under: ${roots.join(', ') || '(no existing model roots)'}`);
+      console.log(`No GGUF models found under: ${roots.join(', ') || '(no existing model roots)'}`);
     } else {
       for (const candidate of candidates) {
-        console.log(`${candidate.complete ? 'ready' : 'incomplete'}\t${candidate.profile.profile_id}\t${candidate.modelPath}`);
+        console.log(`${candidate.complete ? candidate.kind === 'profiled' ? 'ready' : 'best-effort' : 'incomplete'}\t${candidate.kind === 'profiled' ? candidate.profile.profile_id : 'unprofiled'}\t${candidate.modelPath}`);
         for (const issue of candidate.issues) {
           console.log(`  - ${issue}`);
         }
