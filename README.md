@@ -13,7 +13,7 @@
 
 **Run frontier-scale open models locally on Apple Silicon.**
 
-Tess Server is a guided terminal application for discovering, configuring, verifying, and serving large GGUF models on your Mac. It combines an open-source TypeScript/Ink interface with the proprietary Tess Server engine and exposes an OpenAI-compatible API for Tess and other local clients.
+Tess Server is a guided terminal application for discovering, configuring, verifying, and serving large GGUF models on your Mac. It combines an open-source TypeScript/Ink interface with the proprietary Tess Server engine and exposes an OpenAI-compatible API for local clients.
 
 Your models and prompts stay on your machine. Tess Server does not download weights, send telemetry, check for updates, or fall back to a cloud service.
 
@@ -28,9 +28,6 @@ tess-server
 The TUI searches common model folders on internal and attached storage. Profiled
 models receive managed, qualified settings; other primary GGUF files appear in a
 separate **Unprofiled Models** section for clearly labeled best-effort launches.
-
-The Silicon chip is Tess Server's primary mark and remains visible throughout
-the TUI.
 
 Model weights are not bundled. You must obtain and store GGUF files under their respective licenses.
 
