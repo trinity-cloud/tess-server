@@ -7,7 +7,7 @@ tess_reject_unmodeled_tuning_env GGML_METAL_FA_GQA_NQ LLAMA_DFLASH_SWA
 tess_validate_server_settings
 MODEL=${MODEL:?path to laguna-s-2.1-Q4_K_M.gguf}
 DRAFT_MODEL=${DRAFT_MODEL:?path to laguna-s-2.1-DFlash-BF16.gguf}
-CTX=${CTX:-32768}; NP=${NP:-1}
+CTX=${CTX:-16384}; NP=${NP:-1}
 [ -z "${UB+x}" ] || tess_die "UB is locked at 2048 for Laguna S.2"
 [ -z "${BATCH+x}" ] || tess_die "BATCH is locked at 2048 for Laguna S.2"
 tess_require_uint CTX "$CTX"
@@ -24,7 +24,7 @@ export LLAMA_DFLASH_SWA=${LLAMA_DFLASH_SWA:-512}
 [ "$GGML_METAL_FA_GQA_NQ" = 2 ] && [ "$LLAMA_DFLASH_SWA" = 512 ] || tess_die "Laguna verified serving requires NQ=2 and DFlash SWA=512"
 tess_profile_begin laguna-s21-q4km-dflash
 tess_require_single_slot "$NP"
-tess_mark_custom CTX "$CTX" 32768
+tess_mark_custom CTX "$CTX" 16384
 
 if [ "${PRINT_CONFIG:-0}" = 1 ]; then
   tess_print_effective_config "model=$(basename -- "$MODEL")" "draft=$(basename -- "$DRAFT_MODEL")" "context=$CTX" "batch=$BATCH" "ubatch=$UB" "slots=$NP" "kv_type=f16" "speculation=dflash" "n_max=15" "p_min=0.7" "host=127.0.0.1" "port=$PORT" "alias=$ALIAS" "auth=$TESS_AUTH_MODE"

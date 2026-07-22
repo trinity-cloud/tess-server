@@ -29,11 +29,11 @@
   "context": {
     "trained": 262144,
     "engine_allocatable": 262144,
-    "validated": 32768,
-    "qualified": 32768,
-    "validated_prompt": 24576,
-    "validated_generation": 1024,
-    "default": 32768
+    "validated": 16384,
+    "qualified": 16384,
+    "validated_prompt": 16384,
+    "validated_generation": 128,
+    "default": 16384
   },
   "runtime": {
     "batch": 2048,
@@ -65,14 +65,14 @@
     "laguna-context-and-speculation-qualification-2026-07"
   ],
   "limitations": [
-    "The 32K release tier is qualified with an exact 24,576-token prompt and 1,024-token generation; deeper native windows remain gated.",
+    "The 32K tier is available as an experimental release-qualification candidate; deeper native windows remain gated.",
     "Long speculative generations can encounter rare deterministic near-tie differences outside the recorded bit-identity probe lengths; every accepted draft token is still verified by the target model."
   ],
   "expert": {
     "context_presets": [
       {"tokens": 8192, "label": "8K", "group": "Native", "batch": 2048, "ubatch": 2048},
-      {"tokens": 16384, "label": "16K", "group": "Native", "batch": 2048, "ubatch": 2048},
-      {"tokens": 32768, "label": "32K", "group": "Native", "recommended": true, "batch": 2048, "ubatch": 2048},
+      {"tokens": 16384, "label": "16K", "group": "Native", "recommended": true, "batch": 2048, "ubatch": 2048},
+      {"tokens": 32768, "label": "32K", "group": "Native", "experimental": true, "batch": 2048, "ubatch": 2048},
       {"tokens": 65536, "label": "64K", "group": "Native", "availability": "qualification-pending", "unavailable_reason": "64K release qualification is pending", "batch": 2048, "ubatch": 2048},
       {"tokens": 131072, "label": "128K", "group": "Native", "availability": "qualification-pending", "unavailable_reason": "128K begins after the 64K gate passes", "batch": 2048, "ubatch": 2048},
       {"tokens": 262144, "label": "256K", "group": "Native · YaRN", "availability": "qualification-pending", "unavailable_reason": "Full trained-context qualification is pending", "batch": 2048, "ubatch": 2048}
