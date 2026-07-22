@@ -3,6 +3,24 @@
   "version": "0.1.0-rc.2",
   "description": "Interactive local model launcher and proprietary Tess Server engine for Apple Silicon",
   "author": "Trinity Cloud, Inc.",
+  "keywords": [
+    "apple-silicon",
+    "gguf",
+    "local-ai",
+    "local-llm",
+    "llama.cpp",
+    "openai-compatible",
+    "terminal",
+    "tui"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/trinity-cloud/tess-server.git"
+  },
+  "homepage": "https://github.com/trinity-cloud/tess-server#readme",
+  "bugs": {
+    "url": "https://github.com/trinity-cloud/tess-server/issues"
+  },
   "type": "module",
   "bin": {
     "tess-server": "build/cli.js"
