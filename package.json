@@ -35,6 +35,7 @@
   },
   "scripts": {
     "build": "node scripts/build-tui.mjs",
+    "prepare": "npm run build",
     "typecheck": "tsc --noEmit",
     "test": "node scripts/test-tui.mjs",
     "sidecar:stage": "node scripts/stage-npm-sidecar.mjs",

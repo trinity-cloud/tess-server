@@ -1,4 +1,4 @@
-import {rm} from 'node:fs/promises';
+import {chmod, rm} from 'node:fs/promises';
 import {dirname, join, resolve} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
@@ -13,3 +13,4 @@ if (result.error) {
 if (result.status !== 0) {
   process.exit(result.status ?? 1);
 }
+await chmod(join(output, 'cli.js'), 0o755);
