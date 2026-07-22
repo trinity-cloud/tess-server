@@ -66,21 +66,17 @@ remains available as the unrestricted expert escape hatch.
 
 See [Supported models](docs/models.md) for context and memory guidance.
 
-## Recorded release-qualified performance
+## Stock llama.cpp comparison
 
-The following five-profile results come from the preceding RC2 engine candidate on one Apple M4 Max with 128 GiB unified memory. Every model ran alone with an exact 24,576-token prompt, 1,024 generated tokens, temperature zero, and prompt caching disabled. Laguna S.2 is intentionally omitted until it clears the identical content-validation gate on the Laguna-capable build.
+We measured the packaged Tess Server engine against official stock llama.cpp `b10004` on one Apple M4 Max with 128 GiB unified memory. Every phase used the same deterministic recall workload, exactly 24,576 prompt tokens, 1,024 generated tokens, temperature zero, one slot, and no prompt cache. Each Tess result was bracketed by two stock runs; the charts use their mean.
 
-| Model | Prefill | Decode |
-|---|---:|---:|
-| **Tess-4 / Qwen3.6-35B-A3B** | **1,286.32 tok/s** | **102.31 tok/s** |
-| **NVIDIA Nemotron-3-Super** | **379.03 tok/s** | **27.62 tok/s** |
-| **DeepSeek-V4-Flash** | **245.91 tok/s** | **29.16 tok/s** |
-| **MiniMax-M2.7** | **252.26 tok/s** | **21.28 tok/s** |
-| **Tencent Hy3** | **145.37 tok/s** | **18.84 tok/s** |
+![Stock llama.cpp versus Tess Server decode throughput](docs/assets/performance/stock-vs-tess-decode.svg)
 
-These are sustained release-qualification measurements under one common protocol, not cherry-picked peaks or stock-runtime comparisons. Throughput varies with context depth, prompt shape, output, temperature, memory pressure, and cooling.
+DeepSeek-V4-Flash reaches **3.90x stock decode throughput** and **1.29x stock prefill throughput**. Tess-4-35B-A3B reaches **1.54x stock decode**, while MiniMax-M2.7 reaches **1.32x stock prefill**. The complete results also show the tradeoffs plainly: stock is 6% faster on Tess-4 prefill and 4% faster on Nemotron decode, while Hy3 prefill is effectively tied.
 
-See [Performance and methodology](docs/performance.md) for the protocol, memory observations, and claim scope.
+![Stock llama.cpp versus Tess Server prefill throughput](docs/assets/performance/stock-vs-tess-prefill.svg)
+
+Official stock `b10004` cannot load Laguna S.2, so Laguna carries no headline stock speedup claim. See [Performance and methodology](docs/performance.md) for the complete table, the disclosed Laguna support-reference result, configuration scope, correctness limitations, and downloadable [JSON](docs/assets/performance/stock-vs-tess-data.json) and [CSV](docs/assets/performance/stock-vs-tess-data.csv) data.
 
 ## Configure the server
 

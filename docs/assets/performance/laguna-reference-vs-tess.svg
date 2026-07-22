@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="720" viewBox="0 0 1400 720">
+<defs><linearGradient id="tess" x1="0" x2="1"><stop stop-color="#43d9e8"/><stop offset="1" stop-color="#e348d1"/></linearGradient></defs>
+<rect width="100%" height="100%" fill="#0d1117"/>
+<text x="90" y="72" fill="#f6f8fa" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="38" font-weight="700">Laguna S.2 · model-support reference vs Tess</text>
+<text x="90" y="112" fill="#9da7b3" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="19">Stock llama.cpp b10004 cannot load Laguna; baseline adds only the public Laguna/DFlash support patches.</text>
+<text x="90" y="142" fill="#f0f3f6" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="25" font-weight="600">24K prefill</text>
+<rect x="300" y="173" width="834.8" height="34" rx="6" fill="#737b87"/>
+<text x="1149.8" y="198" fill="#c8d0da" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20">477.6</text>
+<rect x="300" y="235" width="829.9" height="34" rx="6" fill="url(#tess)"/>
+<text x="1144.9" y="260" fill="#f5b9ed" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" font-weight="700">474.8 · 0.99×</text>
+<text x="280" y="198" text-anchor="end" fill="#9da7b3" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">reference</text>
+<text x="280" y="260" text-anchor="end" fill="#49dbe5" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">Tess</text>
+<text x="90" y="352" fill="#f0f3f6" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="25" font-weight="600">1K decode</text>
+<rect x="300" y="383" width="166.1" height="34" rx="6" fill="#737b87"/>
+<text x="481.1" y="408" fill="#c8d0da" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20">13.4</text>
+<rect x="300" y="445" width="834.8" height="34" rx="6" fill="url(#tess)"/>
+<text x="1149.8" y="470" fill="#f5b9ed" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="20" font-weight="700">67.6 · 5.03×</text>
+<text x="280" y="408" text-anchor="end" fill="#9da7b3" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">reference</text>
+<text x="280" y="470" text-anchor="end" fill="#49dbe5" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18">Tess</text>
+<text x="90" y="660" fill="#6f7884" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16">Apple M4 Max · 128 GiB · exact shared prompt tokens · 1,024 generated tokens · temperature 0 · A/B/A bracket</text>
+</svg>

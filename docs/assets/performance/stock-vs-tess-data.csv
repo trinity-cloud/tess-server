@@ -1,0 +1,13 @@
+model,metric,stock_supported,baseline_kind,baseline_tps,tess_tps,speedup,baseline_drift_percent
+DeepSeek-V4-Flash,prompt_tps,True,stock,188.749488,243.407674,1.289581,1.410845
+DeepSeek-V4-Flash,decode_tps,True,stock,7.564180,29.468580,3.895806,0.500086
+Laguna S.2,prompt_tps,False,laguna-reference,477.590253,474.799361,0.994156,1.200433
+Laguna S.2,decode_tps,False,laguna-reference,13.448476,67.582431,5.025286,0.113951
+Tess-4-35B-A3B,prompt_tps,True,stock,1317.614601,1234.097735,0.936615,0.204392
+Tess-4-35B-A3B,decode_tps,True,stock,63.573583,97.661596,1.536198,0.082099
+NVIDIA Nemotron-3-Super,prompt_tps,True,stock,321.870223,354.976392,1.102856,0.332411
+NVIDIA Nemotron-3-Super,decode_tps,True,stock,27.494755,26.477178,0.962990,0.922258
+MiniMax-M2.7,prompt_tps,True,stock,190.447428,251.364784,1.319864,0.170088
+MiniMax-M2.7,decode_tps,True,stock,19.778655,20.349906,1.028882,0.471950
+Tencent Hy3,prompt_tps,True,stock,144.567429,144.054580,0.996453,0.182289
+Tencent Hy3,decode_tps,True,stock,16.825579,18.528970,1.101238,0.019831

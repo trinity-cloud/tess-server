@@ -1,0 +1,212 @@
+{
+  "schema_version": 1,
+  "protocol": {
+    "hardware": "Apple M4 Max, 128 GiB unified memory",
+    "prompt_tokens": 24576,
+    "output_tokens": 1024,
+    "temperature": 0,
+    "cache_prompt": false,
+    "bracket": "baseline A1 / Tess B / baseline A2",
+    "stock_revision": "llama.cpp b10004 (7cbd61002)",
+    "tess_version": "0.1.0-rc.2",
+    "qwen_target_trunk": {
+      "shared_tensor_count": 733,
+      "shared_trunk_byte_identical": true,
+      "tess_only_tensor_count": 23
+    }
+  },
+  "models": [
+    {
+      "profile_id": "dsv4-dspark",
+      "label": "DeepSeek-V4-Flash",
+      "baseline_kind": "stock",
+      "stock_supported": true,
+      "same_prompt_tokens": true,
+      "baseline_repeatable": true,
+      "cross_engine_bit_identical": false,
+      "recall_pass": {
+        "baseline-a1": true,
+        "tess-b": true,
+        "baseline-a2": true
+      },
+      "metrics": {
+        "prompt_tps": {
+          "baseline_a1": 187.41800605223807,
+          "tess": 243.40767415984487,
+          "baseline_a2": 190.0809692644425,
+          "baseline_bracket_mean": 188.74948765834029,
+          "tess_speedup": 1.289580582069937,
+          "baseline_drift_percent": 1.4108452665178732
+        },
+        "decode_tps": {
+          "baseline_a1": 7.54526592184478,
+          "tess": 29.4685799180549,
+          "baseline_a2": 7.5830933186794,
+          "baseline_bracket_mean": 7.56417962026209,
+          "tess_speedup": 3.8958064717444993,
+          "baseline_drift_percent": 0.5000859145820978
+        }
+      }
+    },
+    {
+      "profile_id": "laguna-s21-q4km-dflash",
+      "label": "Laguna S.2",
+      "baseline_kind": "laguna-reference",
+      "stock_supported": false,
+      "same_prompt_tokens": true,
+      "baseline_repeatable": true,
+      "cross_engine_bit_identical": false,
+      "recall_pass": {
+        "baseline-a1": false,
+        "tess-b": false,
+        "baseline-a2": false
+      },
+      "metrics": {
+        "prompt_tps": {
+          "baseline_a1": 480.45682811144763,
+          "tess": 474.79936123875643,
+          "baseline_a2": 474.7236781164071,
+          "baseline_bracket_mean": 477.59025311392736,
+          "tess_speedup": 0.9941563047885209,
+          "baseline_drift_percent": 1.2004327889147535
+        },
+        "decode_tps": {
+          "baseline_a1": 13.45613793781874,
+          "tess": 67.58243060079658,
+          "baseline_a2": 13.44081328681097,
+          "baseline_bracket_mean": 13.448475612314855,
+          "tess_speedup": 5.02528558247233,
+          "baseline_drift_percent": 0.1139508405974068
+        }
+      }
+    },
+    {
+      "profile_id": "qwen36-a3b-q8-q4mtp",
+      "label": "Tess-4-35B-A3B",
+      "baseline_kind": "stock",
+      "stock_supported": true,
+      "same_prompt_tokens": true,
+      "baseline_repeatable": true,
+      "cross_engine_bit_identical": false,
+      "recall_pass": {
+        "baseline-a1": true,
+        "tess-b": true,
+        "baseline-a2": true
+      },
+      "metrics": {
+        "prompt_tps": {
+          "baseline_a1": 1316.2680522901624,
+          "tess": 1234.0977347557596,
+          "baseline_a2": 1318.9611506476251,
+          "baseline_bracket_mean": 1317.6146014688939,
+          "tess_speedup": 0.9366151023068289,
+          "baseline_drift_percent": 0.20439196366376466
+        },
+        "decode_tps": {
+          "baseline_a1": 63.54748629353949,
+          "tess": 97.6615960842278,
+          "baseline_a2": 63.599679765674935,
+          "baseline_bracket_mean": 63.573583029607214,
+          "tess_speedup": 1.5361977637589699,
+          "baseline_drift_percent": 0.08209930862499186
+        }
+      }
+    },
+    {
+      "profile_id": "nemotron3-super-q4km",
+      "label": "NVIDIA Nemotron-3-Super",
+      "baseline_kind": "stock",
+      "stock_supported": true,
+      "same_prompt_tokens": true,
+      "baseline_repeatable": true,
+      "cross_engine_bit_identical": false,
+      "recall_pass": {
+        "baseline-a1": true,
+        "tess-b": true,
+        "baseline-a2": true
+      },
+      "metrics": {
+        "prompt_tps": {
+          "baseline_a1": 321.335256777283,
+          "tess": 354.976392466614,
+          "baseline_a2": 322.40518888692293,
+          "baseline_bracket_mean": 321.87022283210297,
+          "tess_speedup": 1.1028556458041172,
+          "baseline_drift_percent": 0.332411025855607
+        },
+        "decode_tps": {
+          "baseline_a1": 27.36796872717805,
+          "tess": 26.47717832710568,
+          "baseline_a2": 27.621541187588704,
+          "baseline_bracket_mean": 27.49475495738338,
+          "tess_speedup": 0.9629901546002162,
+          "baseline_drift_percent": 0.9222575753218769
+        }
+      }
+    },
+    {
+      "profile_id": "minimax-m27-iq4xs",
+      "label": "MiniMax-M2.7",
+      "baseline_kind": "stock",
+      "stock_supported": true,
+      "same_prompt_tokens": true,
+      "baseline_repeatable": true,
+      "cross_engine_bit_identical": false,
+      "recall_pass": {
+        "baseline-a1": true,
+        "tess-b": true,
+        "baseline-a2": true
+      },
+      "metrics": {
+        "prompt_tps": {
+          "baseline_a1": 190.2854640449321,
+          "tess": 251.3647836403911,
+          "baseline_a2": 190.60939279437395,
+          "baseline_bracket_mean": 190.44742841965302,
+          "tess_speedup": 1.319864414690368,
+          "baseline_drift_percent": 0.17008827692231532
+        },
+        "decode_tps": {
+          "baseline_a1": 19.825328018183544,
+          "tess": 20.34990630497729,
+          "baseline_a2": 19.731982638013463,
+          "baseline_bracket_mean": 19.778655328098502,
+          "tess_speedup": 1.028882194840983,
+          "baseline_drift_percent": 0.471950082660425
+        }
+      }
+    },
+    {
+      "profile_id": "hy3-iq2m",
+      "label": "Tencent Hy3",
+      "baseline_kind": "stock",
+      "stock_supported": true,
+      "same_prompt_tokens": true,
+      "baseline_repeatable": true,
+      "cross_engine_bit_identical": false,
+      "recall_pass": {
+        "baseline-a1": true,
+        "tess-b": true,
+        "baseline-a2": true
+      },
+      "metrics": {
+        "prompt_tps": {
+          "baseline_a1": 144.69919356871432,
+          "tess": 144.0545798043498,
+          "baseline_a2": 144.43566366195114,
+          "baseline_bracket_mean": 144.56742861533274,
+          "tess_speedup": 0.9964525286511975,
+          "baseline_drift_percent": 0.18228857584815072
+        },
+        "decode_tps": {
+          "baseline_a1": 16.823910812374244,
+          "tess": 18.52896954628145,
+          "baseline_a2": 16.82724746787721,
+          "baseline_bracket_mean": 16.825579140125726,
+          "tess_speedup": 1.1012381441357622,
+          "baseline_drift_percent": 0.01983085084429163
+        }
+      }
+    }
+  ]
+}
