@@ -305,7 +305,7 @@ export function App({profiles, payloadRoot, initialModelRoots, initialServerSett
   };
 
   return <Box flexDirection="column" paddingX={1}>
-    <Brand version={version} compact={view !== 'discovering' && view !== 'models'} />
+    <Brand version={version} />
     {view === 'discovering' && <Text color="yellow">Scanning configured model folders…</Text>}
     {view === 'models' && <Box flexDirection="column"><Text bold>Models</Text>{discoveryError && <Text color="red">{discoveryError}</Text>}{modelRows.length > 0 ? modelRows : <Text color="yellow">No profile-matched models found.</Text>}<Box marginTop={1}><Text>Server  127.0.0.1:{serverSettings.port} · auth {serverSettings.auth.mode === 'file' ? 'bearer' : 'off'} · model {serverSettings.alias}</Text></Box><Box marginTop={1}><Text><Key>↑/↓</Key> select  <Key>enter</Key> details  <Key>c</Key> configure server  <Key>a</Key> add folder  <Key>r</Key> rescan  <Key>q</Key> quit</Text></Box></Box>}
     {view === 'add-root' && <Box flexDirection="column"><Text bold>Add model folder</Text><Text>Path: <Text color="cyan">{pathInput}</Text><Text inverse> </Text></Text><Text dimColor>Enter to scan · Esc to cancel</Text></Box>}

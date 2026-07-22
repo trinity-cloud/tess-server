@@ -6,9 +6,9 @@ monochrome documentation and copied terminal text.
 
 ## Silicon — primary mark
 
-Use Silicon for the public face of Tess Server: repository headers, launch and
-model-discovery screens, release announcements, and other places where the full
-identity should lead.
+Use Silicon for the public face of Tess Server: repository headers, every TUI
+screen, release announcements, and other places where the product identity
+should lead.
 
 ```text
     ╷ ╷ ╷ ╷ ╷ ╷
@@ -21,11 +21,10 @@ identity should lead.
     ╵ ╵ ╵ ╵ ╵ ╵
 ```
 
-## Mini — compact product mark
+## Mini — secondary wordmark
 
-Use Mini as the persistent header on configuration, model-detail, and server
-status screens. It keeps the Tess Server identity visible without taking space
-from the user's work.
+Use Mini only as optional promotional artwork where the full chip cannot fit.
+The product itself always uses Silicon.
 
 ```text
 ▀█▀ █▀▀ █▀▀ █▀▀   █▀▀ █▀▀ █▀█ █ █ █▀▀ █▀█
