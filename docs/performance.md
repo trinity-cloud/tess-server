@@ -1,6 +1,6 @@
 # Performance and methodology
 
-This page reports the common-protocol qualification sweep for the packaged Tess Server release candidate. It intentionally describes measured product behavior without disclosing proprietary engine implementation details.
+This page reports the common-protocol qualification sweep retained from the five-profile Tess Server RC2 candidate. It intentionally describes measured product behavior without disclosing proprietary engine implementation details. The current six-profile package adds Laguna S.2; its performance row remains unpublished until it clears this same protocol end to end.
 
 ## Qualification host
 
@@ -12,7 +12,7 @@ This page reports the common-protocol qualification sweep for the packaged Tess 
 - No concurrent known GPU workload
 - No macOS thermal or performance warning before or after any measured row
 
-The engine was built from commit `ca8c27d39244ec3c595de52be1442051868ffb08` and packaged as `0.1.0-rc.2`.
+The measured five-profile engine was built from commit `ca8c27d39244ec3c595de52be1442051868ffb08` and packaged as `0.1.0-rc.2`. These values are retained evidence, not a claim that all six profiles were re-swept on one final build.
 
 ## Common protocol
 

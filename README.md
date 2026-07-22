@@ -66,9 +66,9 @@ remains available as the unrestricted expert escape hatch.
 
 See [Supported models](docs/models.md) for context and memory guidance.
 
-## Release-qualified performance
+## Recorded release-qualified performance
 
-The following results come from the packaged release candidate on one Apple M4 Max with 128 GiB unified memory. Every model ran alone with an exact 24,576-token prompt, 1,024 generated tokens, temperature zero, and prompt caching disabled.
+The following five-profile results come from the preceding RC2 engine candidate on one Apple M4 Max with 128 GiB unified memory. Every model ran alone with an exact 24,576-token prompt, 1,024 generated tokens, temperature zero, and prompt caching disabled. Laguna S.2 is intentionally omitted until it clears the identical content-validation gate on the Laguna-capable build.
 
 | Model | Prefill | Decode |
 |---|---:|---:|
