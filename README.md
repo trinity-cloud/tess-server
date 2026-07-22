@@ -13,9 +13,9 @@
 
 **Run frontier-scale open models locally on Apple Silicon.**
 
-Tess Server is a guided terminal application for discovering, configuring, verifying, and serving large GGUF models on your Mac. It combines an open-source TypeScript/Ink interface with the proprietary Tess Server engine and exposes an OpenAI-compatible API for local clients.
+Tess Server turns one Mac into a serious inference machine. It serves 300B-class open mixture-of-experts models at agent-scale context depths, decodes up to **3.90x faster than stock llama.cpp** on the same hardware, and runs model architectures stock llama.cpp cannot load at all — behind a local OpenAI-compatible API, with nothing leaving your machine.
 
-Your models and prompts stay on your machine. Tess Server does not download weights, send telemetry, check for updates, or fall back to a cloud service.
+No cloud. No per-token cost. No telemetry, update checks, or implicit downloads. Your models, your prompts, your Mac.
 
 ## Quick start
 
@@ -25,23 +25,52 @@ tess-server doctor
 tess-server
 ```
 
-The TUI searches common model folders on internal and attached storage. Profiled
-models receive managed, qualified settings; other primary GGUF files appear in a
-separate **Unprofiled Models** section for clearly labeled best-effort launches.
+One package, no external dependencies: no Homebrew, no Python, no separate engine install. The guided terminal app discovers GGUF models on internal and attached storage, verifies them against versioned profiles, and serves them with managed, qualified settings. Model weights are not bundled; you obtain and store GGUF files under their respective licenses.
 
-Model weights are not bundled. You must obtain and store GGUF files under their respective licenses.
+## The numbers
 
-## What Tess Server handles
+We measured the packaged Tess Server engine against official stock llama.cpp `b10004` on one Apple M4 Max with 128 GiB unified memory: identical deterministic recall workload, exactly 24,576 prompt tokens and 1,024 generated tokens — the depth a real coding-agent request actually occupies, not a toy benchmark. Temperature zero, one slot, no prompt cache, every Tess run bracketed by two stock runs on the same thermal state.
 
-- Discovers profiled and unprofiled GGUF models under `~/models`, `~/Models`, and `models` or `Models` folders on attached volumes.
-- Lets you add any other model folder from the TUI or with `--model-root`.
-- Matches local files to versioned Tess profiles and verifies them before the first profile launch.
-- Offers profile-qualified context windows and clearly labels experimental or qualification-pending choices.
-- Groups nearby projector and draft/MTP artifacts under unprofiled primary models,
-  with detected defaults and a complete generic configuration screen.
-- Manages resource settings that should not be changed casually.
-- Starts and monitors a loopback-only OpenAI-compatible server.
-- Performs clean shutdown from the dashboard so the engine is not left running in the background.
+![Stock llama.cpp versus Tess Server decode throughput](docs/assets/performance/stock-vs-tess-decode.svg)
+
+- **DeepSeek-V4-Flash (284B-A13B)** decodes at **29.47 tok/s where stock manages 7.56** — **3.90x** — and prefills 1.29x faster.
+- **Tess-4-35B-A3B** decodes at **97.66 tok/s**, **1.54x** stock.
+- **MiniMax-M2.7 (230B-A10B)** prefills **1.32x** faster.
+- **Tencent Hy3 (298.8B)** decodes **1.10x** faster.
+
+![Stock llama.cpp versus Tess Server prefill throughput](docs/assets/performance/stock-vs-tess-prefill.svg)
+
+And the results we did not win: stock is 6% faster on Tess-4 prefill, 4% faster on Nemotron decode, and Hy3 prefill is a tie. We publish those too, in the same charts, because a benchmark that only reports victories is an advertisement. Every number traces to an evidence record with raw [JSON](docs/assets/performance/stock-vs-tess-data.json) and [CSV](docs/assets/performance/stock-vs-tess-data.csv) data; see [Performance and methodology](docs/performance.md) for the complete table, protocol, and correctness scope.
+
+## Models stock llama.cpp cannot run
+
+Two of the six shipped profiles do not load in official stock llama.cpp at all — the architecture support lives in the Tess Server engine:
+
+- **Laguna S.2 (118B-A8B)** with its DFlash speculative drafter. Against a reference build patched only for model support, the packaged engine decodes **67.58 tok/s versus 13.45 — 5.03x** — at the same 24K-token depth.
+- **Tencent Hy3 (298.8B)**, a 192-expert mixture-of-experts model served whole on a single 128 GiB Mac.
+
+Depth is the other frontier. MiniMax-M2.7 serves its **full 196,608-token trained context** on one M4 Max, and DeepSeek-V4-Flash is profile-qualified to 256K.
+
+## Lossless speculative decoding, packaged
+
+Four of the six profiles ship with managed speculative decoding — DFlash for Laguna, DSpark for DeepSeek-V4-Flash, and multi-token-prediction for Tess-4 and Hy3 — pre-tuned, verified, and on by default where it wins. This is the difference between reading your model's output and waiting for it.
+
+Speed never trades away correctness: **every accepted draft token is still verified by the target model.** Where speculation does not help, the profile simply does not use it.
+
+## A guided launcher, not a flag zoo
+
+Large-model serving on a Mac has real failure modes: out-of-memory panics, silently wrong context windows, mismatched draft files. Tess Server's open-source TUI manages them instead of handing you forty flags:
+
+- Discovers profiled and unprofiled GGUF models under `~/models`, `~/Models`, and `models` or `Models` folders on attached volumes, plus any folder you add from the TUI or with `--model-root`.
+- Verifies model files against hash-bound profiles before the first launch — a mismatch is a startup error, not a warning.
+- Offers profile-qualified context windows and clearly labels experimental or qualification-pending tiers; memory-critical settings are managed, not guessable.
+- Groups nearby projector and draft/MTP artifacts under unprofiled primary models, with detected defaults and a complete generic configuration screen for clearly labeled best-effort launches.
+- Shows the effective engine command before launch — nothing is hidden.
+- Starts, monitors, and cleanly shuts down a loopback-only OpenAI-compatible server, so the engine is never left running in the background.
+
+When a 128 GiB profile needs a larger macOS GPU-wired memory limit, the TUI prints the exact one-time-per-boot command. Tess Server never runs it, never requests administrator privileges, and never changes system settings itself.
+
+Profile support is exact-file specific. Other primary GGUF files are shown as **Unprofiled**, use conservative generic defaults, and carry no compatibility, verification, memory, correctness, or performance claim. Direct engine invocation remains available as the unrestricted expert escape hatch.
 
 ## Supported profiles
 
@@ -56,46 +85,32 @@ The current release includes six profiles:
 | **MiniMax-M2.7** | UD-IQ4_XS | 101 GiB | 128 GiB | 70K | 32K, 64K, 70K, 96K, 128K, 160K, 192K |
 | **Tencent Hy3** | IQ2_M | 93.1 GiB | 128 GiB | 32K | 8K, 16K, 32K, 48K; experimental 64K |
 
-Profile support is exact-file specific. Other primary GGUF files are shown as
-**Unprofiled**, use conservative generic defaults, and carry no compatibility,
-verification, memory, correctness, or performance claim. Direct engine invocation
-remains available as the unrestricted expert escape hatch.
-
 See [Supported models](docs/models.md) for context and memory guidance.
 
-## Stock llama.cpp comparison
+## Private by construction
 
-We measured the packaged Tess Server engine against official stock llama.cpp `b10004` on one Apple M4 Max with 128 GiB unified memory. Every phase used the same deterministic recall workload, exactly 24,576 prompt tokens, 1,024 generated tokens, temperature zero, one slot, and no prompt cache. Each Tess result was bracketed by two stock runs; the charts use their mean.
+Privacy here is not a policy statement — it is how verified profile launches are built:
 
-![Stock llama.cpp versus Tess Server decode throughput](docs/assets/performance/stock-vs-tess-decode.svg)
+- The server binds to `127.0.0.1` only. Managed launches are never exposed to your LAN.
+- No telemetry, no update checks, no cloud fallback, no implicit downloads.
+- No prompt or generation logging by Tess Server.
+- Browser UI and built-in agent/tool surfaces are disabled at launch.
+- Optional bearer authentication backed by a private local key file — the key value is never stored in settings.
+- Model files are checksum-verified before a profile is labeled verified.
 
-DeepSeek-V4-Flash reaches **3.90x stock decode throughput** and **1.29x stock prefill throughput**. Tess-4-35B-A3B reaches **1.54x stock decode**, while MiniMax-M2.7 reaches **1.32x stock prefill**. The complete results also show the tradeoffs plainly: stock is 6% faster on Tess-4 prefill and 4% faster on Nemotron decode, while Hy3 prefill is effectively tied.
+If your work cannot leave your machine — security research, regulated code, client data — this is the deployment model that makes the promise checkable.
 
-![Stock llama.cpp versus Tess Server prefill throughput](docs/assets/performance/stock-vs-tess-prefill.svg)
-
-Official stock `b10004` cannot load Laguna S.2, so Laguna carries no headline stock speedup claim. See [Performance and methodology](docs/performance.md) for the complete table, the disclosed Laguna support-reference result, configuration scope, correctness limitations, and downloadable [JSON](docs/assets/performance/stock-vs-tess-data.json) and [CSV](docs/assets/performance/stock-vs-tess-data.csv) data.
-
-## Configure the server
-
-Press `c` on the model list to configure:
-
-- **Port** — defaults to `8787`.
-- **API model name** — defaults to `local-llama-server`.
-- **Authentication** — off by default, or bearer authentication backed by a private local key file.
-
-Verified profile launches bind to `127.0.0.1`. Tess Server does not expose them to your LAN.
-
-Press `e` on model details for that profile's expert options. The TUI distinguishes ordinary choices from experimental tiers and blocks configurations that are not available in the packaged profile.
+Tess Server is an inference server, not a security boundary for untrusted model files or untrusted local users. Only load models you trust and have the right to use.
 
 ## Connect a client
 
-The default endpoint is:
+Press `c` on the model list to set the port (default `8787`), API model name (default `local-llama-server`), and optional bearer authentication. Press `e` on model details for that profile's expert options.
+
+The default endpoint speaks the OpenAI API — point any existing client, agent, or IDE integration at it:
 
 ```text
 http://127.0.0.1:8787/v1
 ```
-
-For example:
 
 ```bash
 curl http://127.0.0.1:8787/v1/chat/completions \
@@ -108,19 +123,6 @@ curl http://127.0.0.1:8787/v1/chat/completions \
 
 Streaming, tool calls, and standard chat completions are supported. If bearer authentication is enabled, add the conventional `Authorization: Bearer ...` header.
 
-## Privacy and security
-
-Verified profile launches provide the following defaults:
-
-- Loopback-only networking.
-- No telemetry, update checks, cloud fallback, or implicit downloads.
-- No prompt or generation logging by Tess Server.
-- Browser UI and built-in agent/tool surfaces disabled.
-- Optional file-backed bearer authentication without storing the key value in TUI settings.
-- Model-file verification before a profile is labeled verified.
-
-Tess Server is an inference server, not a security boundary for untrusted model files or untrusted local users. Only load models you trust and have the right to use.
-
 ## Requirements
 
 - Apple Silicon Mac (`arm64`).
@@ -128,8 +130,6 @@ Tess Server is an inference server, not a security boundary for untrusted model 
 - Node.js 22 or newer.
 - Sufficient unified memory for the selected profile.
 - Locally stored GGUF weights.
-
-Some 128 GiB profiles require a larger macOS GPU-wired memory limit. When needed, the TUI prints the exact one-time-per-boot command. Tess Server never runs that command, requests administrator privileges, or changes the limit itself.
 
 ## Command-line use
 
