@@ -3,7 +3,7 @@
 set -euo pipefail
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 . "$SCRIPT_DIR/../profile-common.sh"
-tess_reject_unmodeled_tuning_env GGML_METAL_FA_GQA_NQ LLAMA_DFLASH_SWA
+tess_reject_unmodeled_tuning_env GGML_METAL_FA_GQA_NQ
 tess_validate_server_settings
 MODEL=${MODEL:?path to laguna-s-2.1-Q4_K_M.gguf}
 DRAFT_MODEL=${DRAFT_MODEL:?path to laguna-s-2.1-DFlash-BF16.gguf}
@@ -20,8 +20,7 @@ case "$CTX" in
 esac
 BATCH=2048; UB=2048
 export GGML_METAL_FA_GQA_NQ=${GGML_METAL_FA_GQA_NQ:-2}
-export LLAMA_DFLASH_SWA=${LLAMA_DFLASH_SWA:-512}
-[ "$GGML_METAL_FA_GQA_NQ" = 2 ] && [ "$LLAMA_DFLASH_SWA" = 512 ] || tess_die "Laguna verified serving requires NQ=2 and DFlash SWA=512"
+[ "$GGML_METAL_FA_GQA_NQ" = 2 ] || tess_die "Laguna verified serving requires the managed NQ=2 policy"
 tess_profile_begin laguna-s21-q4km-dflash
 tess_require_single_slot "$NP"
 tess_mark_custom CTX "$CTX" 16384

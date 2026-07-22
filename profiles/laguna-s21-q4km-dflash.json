@@ -43,8 +43,7 @@
     "flash_attention": true,
     "jinja": true,
     "env": {
-      "GGML_METAL_FA_GQA_NQ": 2,
-      "LLAMA_DFLASH_SWA": 512
+      "GGML_METAL_FA_GQA_NQ": 2
     }
   },
   "speculation": {
