@@ -8,6 +8,7 @@ Model weights are not included and Tess Server does not download them. You are r
 
 | Model | Quantization | GGUF size | Memory class | Default | Context choices |
 |---|---|---:|---:|---:|---|
+| **Laguna S.2** | Q4_K_M + BF16 DFlash | 70.0 GiB + 2.1 GiB draft | 128 GiB | 32K | 8K, 16K, 32K; 64K, 128K, and 256K qualification pending |
 | **Tess-4-35B-A3B** (Qwen3.6-35B-A3B base) | Tess Q8/Q4 build | 35.2 GiB | 64 GiB | 128K | 32K, 64K, 128K, 256K; 512K and 1M qualification pending |
 | **NVIDIA Nemotron-3-Super-120B-A12B** | UD-Q4_K_M | 76.9 GiB | 128 GiB | 32K | 32K, 64K, 128K, 256K; experimental 512K and 1M |
 | **DeepSeek-V4-Flash** | UD-IQ3_XXS | 95.9 GiB | 128 GiB | 32K | 4K, 8K, 16K, 32K, 64K, 128K, 256K; 512K and 1M qualification pending |

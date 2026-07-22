@@ -9,7 +9,7 @@ function launchEnvironment(payloadRoot: string, candidate: ModelCandidate, overr
     ...process.env,
     TESS_PACKAGE_ROOT: payloadRoot,
     MODEL: candidate.modelPath,
-    ...(candidate.draftPath ? {DSPARK: candidate.draftPath} : {}),
+    ...(candidate.draftPath ? {DSPARK: candidate.draftPath, DRAFT_MODEL: candidate.draftPath} : {}),
     ...(overrides.context ? {CTX: String(overrides.context)} : {}),
     ...(overrides.port ? {PORT: String(overrides.port)} : {}),
     ...(overrides.alias ? {ALIAS: overrides.alias} : {}),

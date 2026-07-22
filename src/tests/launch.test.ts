@@ -25,6 +25,18 @@ test('builds a profile verifier spec', () => {
   assert.deepEqual(spec.args, ['/payload/scripts/verify-profile.sh', 'qwen36-a3b-q8-q4mtp', candidate.modelPath]);
 });
 
+test('passes an exact companion to profiled DFlash launchers', () => {
+  const lagunaProfile = {...profile, profile_id: 'laguna-s21-q4km-dflash'} as ProfileDescriptor;
+  const laguna: ModelCandidate = {
+    kind: 'profiled', profile: lagunaProfile, modelPath: '/models/laguna.gguf', draftPath: '/models/laguna-dflash.gguf', complete: true, issues: [],
+  };
+  const spec = serveSpec('/payload', laguna);
+  assert.deepEqual(spec.args, ['/payload/scripts/serve/serve-laguna.sh']);
+  assert.equal(spec.env.DRAFT_MODEL, laguna.draftPath);
+  assert.equal(spec.env.DSPARK, laguna.draftPath);
+  assert.deepEqual(verifySpec('/payload', laguna).args, ['/payload/scripts/verify-profile.sh', 'laguna-s21-q4km-dflash', laguna.modelPath, laguna.draftPath]);
+});
+
 test('builds a configurable generic GGUF launcher with detected companions', () => {
   const genericProfile = {
     ...profile,

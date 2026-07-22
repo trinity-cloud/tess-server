@@ -5,6 +5,7 @@ import type {ProfileDescriptor} from './types.js';
 const launcherByProfile: Readonly<Record<string, string>> = Object.freeze({
   'dsv4-dspark': 'serve-dsv4.sh',
   'hy3-iq2m': 'serve-hy3.sh',
+  'laguna-s21-q4km-dflash': 'serve-laguna.sh',
   'minimax-m27-iq4xs': 'serve-minimax.sh',
   'nemotron3-super-q4km': 'serve-nemotron3.sh',
   'qwen36-a3b-q8-q4mtp': 'serve-qwen36.sh',

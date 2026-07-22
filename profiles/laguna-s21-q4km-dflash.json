@@ -1,0 +1,81 @@
+{
+  "profile_id": "laguna-s21-q4km-dflash",
+  "schema_version": 2,
+  "engine": {
+    "min_version": "0.1.0-rc.2",
+    "max_version": null
+  },
+  "model": {
+    "name": "Laguna S.2",
+    "architecture": "laguna",
+    "quant_label": "Q4_K_M + BF16 DFlash",
+    "total_params": "118B",
+    "active_params": "8B"
+  },
+  "shards": [
+    {
+      "name": "laguna-s-2.1-Q4_K_M.gguf",
+      "bytes": 75173103200,
+      "sha256": "7da520c5f44bc3c79d4eeebfd1151ba7114c5d7568e72a995638417093c5753f"
+    }
+  ],
+  "draft": [
+    {
+      "name": "laguna-s-2.1-DFlash-BF16.gguf",
+      "bytes": 2233764000,
+      "sha256": "24614292a4477f3ae5203c3875edcde0bc219f02616a9c9f65791e29b18a67ee"
+    }
+  ],
+  "context": {
+    "trained": 262144,
+    "engine_allocatable": 262144,
+    "validated": 32768,
+    "qualified": 32768,
+    "validated_prompt": 24576,
+    "validated_generation": 1024,
+    "default": 32768
+  },
+  "runtime": {
+    "batch": 2048,
+    "ubatch": 2048,
+    "kv_type": "f16",
+    "slots": 1,
+    "flash_attention": true,
+    "jinja": true,
+    "env": {
+      "GGML_METAL_FA_GQA_NQ": 2,
+      "LLAMA_DFLASH_SWA": 512
+    }
+  },
+  "speculation": {
+    "type": "draft-dflash",
+    "n_max": 15,
+    "p_min": 0.7,
+    "invariants": [
+      "single-slot",
+      "profile-owned-verification-policy"
+    ]
+  },
+  "memory": {
+    "ram_class_gib": 128,
+    "wired_limit_note": null
+  },
+  "evidence": [
+    "release-qualification-2026-07-21",
+    "laguna-context-and-speculation-qualification-2026-07"
+  ],
+  "limitations": [
+    "The 32K release tier is qualified with an exact 24,576-token prompt and 1,024-token generation; deeper native windows remain gated.",
+    "Long speculative generations can encounter rare deterministic near-tie differences outside the recorded bit-identity probe lengths; every accepted draft token is still verified by the target model."
+  ],
+  "expert": {
+    "context_presets": [
+      {"tokens": 8192, "label": "8K", "group": "Native", "batch": 2048, "ubatch": 2048},
+      {"tokens": 16384, "label": "16K", "group": "Native", "batch": 2048, "ubatch": 2048},
+      {"tokens": 32768, "label": "32K", "group": "Native", "recommended": true, "batch": 2048, "ubatch": 2048},
+      {"tokens": 65536, "label": "64K", "group": "Native", "availability": "qualification-pending", "unavailable_reason": "64K release qualification is pending", "batch": 2048, "ubatch": 2048},
+      {"tokens": 131072, "label": "128K", "group": "Native", "availability": "qualification-pending", "unavailable_reason": "128K begins after the 64K gate passes", "batch": 2048, "ubatch": 2048},
+      {"tokens": 262144, "label": "256K", "group": "Native · YaRN", "availability": "qualification-pending", "unavailable_reason": "Full trained-context qualification is pending", "batch": 2048, "ubatch": 2048}
+    ]
+  }
+}
