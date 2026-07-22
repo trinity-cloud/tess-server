@@ -1,10 +1,14 @@
-# Tess Server brand marks
+# Tess Server brand system
 
-The **Silicon** mark is the public and default TUI identity. On model discovery it appears as the full chip; deeper screens use the compact **Mini** wordmark to preserve vertical space. The TUI applies a dependency-free cyan-to-magenta treatment while retaining clean monochrome output in documentation and copied terminal text.
+Tess Server uses one terminal-native visual identity. The TUI applies a
+dependency-free cyan-to-magenta treatment while the marks remain legible in
+monochrome documentation and copied terminal text.
 
-Preview any launch mark with `tess-server --logo NAME`.
+## Silicon — primary mark
 
-## Silicon — default
+Use Silicon for the public face of Tess Server: repository headers, launch and
+model-discovery screens, release announcements, and other places where the full
+identity should lead.
 
 ```text
     ╷ ╷ ╷ ╷ ╷ ╷
@@ -17,45 +21,31 @@ Preview any launch mark with `tess-server --logo NAME`.
     ╵ ╵ ╵ ╵ ╵ ╵
 ```
 
-## Big Iron
+## Mini — compact product mark
 
-```text
-████████╗███████╗███████╗███████╗
-╚══██╔══╝██╔════╝██╔════╝██╔════╝
-   ██║   █████╗  ███████╗███████╗
-   ██║   ██╔══╝  ╚════██║╚════██║
-   ██║   ███████╗███████║███████║
-   ╚═╝   ╚══════╝╚══════╝╚══════╝
-─────────  S E R V E R  ─────────
-```
-
-## Calvin
-
-```text
-╔╦╗╔═╗╔═╗╔═╗  ╔═╗╔═╗╦═╗╦  ╦╔═╗╦═╗
- ║ ║╣ ╚═╗╚═╗  ╚═╗║╣ ╠╦╝╚╗╔╝║╣ ╠╦╝
- ╩ ╚═╝╚═╝╚═╝  ╚═╝╚═╝╩╚═ ╚╝ ╚═╝╩╚═
-```
-
-## Mini — persistent header
+Use Mini as the persistent header on configuration, model-detail, and server
+status screens. It keeps the Tess Server identity visible without taking space
+from the user's work.
 
 ```text
 ▀█▀ █▀▀ █▀▀ █▀▀   █▀▀ █▀▀ █▀█ █ █ █▀▀ █▀█
  █  █▄▄ ▄▄█ ▄▄█   ▄▄█ █▄▄ █▀▄ ▀▄▀ █▄▄ █▀▄
 ```
 
-## Classic
+## Stream — secondary accent
 
-```text
- _____                  ____
-|_   _|__  ___ ___     / ___|  ___ _ ____   _____ _ __
-  | |/ _ \/ __/ __|    \___ \ / _ \ '__\ \ / / _ \ '__|
-  | |  __/\__ \__ \     ___) |  __/ |   \ V /  __/ |
-  |_|\___||___/___/    |____/ \___|_|    \_/ \___|_|
-```
-
-## Stream
+Use Stream sparingly in compact promotional or status contexts where neither
+primary mark fits. It is an accent, not an alternate logo or a selectable TUI
+theme.
 
 ```text
 ░▒▓█ TESS SERVER █▓▒░ · local llm runtime
 ```
+
+## Usage rules
+
+- Do not offer alternate marks or user-selectable logo themes in the product.
+- Keep the artwork monospace-aligned and within 80 terminal columns.
+- Preserve the exact lettering, proportions, and whitespace shown above.
+- Prefer the cyan-to-magenta treatment on dark terminals and monochrome text
+  where color is unavailable.

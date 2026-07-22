@@ -29,7 +29,6 @@ Usage:
 
 Options:
   --model-root PATH   Add a folder to recursive model discovery (repeatable)
-  --logo NAME         Preview silicon, big-iron, calvin, mini, classic, or stream
   --draft PATH        Separate draft model required by DSpark profiles
   --context TOKENS    Override the profile context (runtime becomes custom if different)
   --speculation MODE  DeepSeek profile mode: dspark or off
@@ -192,7 +191,6 @@ async function main(): Promise<number> {
     payloadRoot={payloadRoot}
     initialModelRoots={roots}
     initialServerSettings={initialServerSettings}
-    logo={options.logo}
     version={version}
     {...(options.context ? {initialContext: options.context} : {})}
   />, {exitOnCtrlC: false});

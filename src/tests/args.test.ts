@@ -3,7 +3,7 @@ import test from 'node:test';
 import {parseCliArgs} from '../args.js';
 
 test('defaults to the TUI', () => {
-  assert.deepEqual(parseCliArgs([]), {command: 'tui', modelRoots: [], logo: 'silicon', noAuth: false, printConfig: false, json: false, version: false, engineArgs: []});
+  assert.deepEqual(parseCliArgs([]), {command: 'tui', modelRoots: [], noAuth: false, printConfig: false, json: false, version: false, engineArgs: []});
 });
 
 test('parses verified serve options', () => {
@@ -22,11 +22,7 @@ test('forwards raw engine arguments', () => {
 test('rejects invalid ports and unknown flags', () => {
   assert.throws(() => parseCliArgs(['--port', '70000']), /at most 65535/);
   assert.throws(() => parseCliArgs(['--wat']), /unknown argument/);
-  assert.throws(() => parseCliArgs(['--logo', 'word-art']), /must be silicon/);
-});
-
-test('parses a TUI logo preview', () => {
-  assert.equal(parseCliArgs(['--logo', 'big-iron']).logo, 'big-iron');
+  assert.throws(() => parseCliArgs(['--logo', 'silicon']), /unknown argument/);
 });
 
 test('parses expert and authentication options', () => {

@@ -7,7 +7,6 @@ import {discoverModels} from '../discovery.js';
 import {serveSpec, spawnCaptured, stopCaptured, verifySpec} from '../launch.js';
 import {formatBytes, formatTokens} from '../profiles.js';
 import {assertAuthKeyFile, assertPortAvailable, defaultServerSettings, saveServerSettings, validateServerSettings} from '../server-settings.js';
-import type {LogoVariant} from '../branding.js';
 import type {LaunchOverrides, ModelCandidate, ProfileDescriptor, ResolvedProfileConfiguration, ServerSettings} from '../types.js';
 import {Brand} from './Brand.js';
 
@@ -23,7 +22,6 @@ export interface AppProps {
   initialModelRoots: string[];
   initialServerSettings: ServerSettings;
   initialContext?: number;
-  logo: LogoVariant;
   version: string;
 }
 
@@ -50,7 +48,7 @@ function cycle<T>(values: readonly T[], current: T, direction: number): T {
   return values[(index + direction + values.length) % values.length] ?? current;
 }
 
-export function App({profiles, payloadRoot, initialModelRoots, initialServerSettings, initialContext, logo, version}: AppProps): React.JSX.Element {
+export function App({profiles, payloadRoot, initialModelRoots, initialServerSettings, initialContext, version}: AppProps): React.JSX.Element {
   const {exit} = useApp();
   const [view, setView] = useState<View>('discovering');
   const [roots, setRoots] = useState(initialModelRoots);
@@ -307,7 +305,7 @@ export function App({profiles, payloadRoot, initialModelRoots, initialServerSett
   };
 
   return <Box flexDirection="column" paddingX={1}>
-    <Brand variant={logo} version={version} compact={view !== 'discovering' && view !== 'models'} />
+    <Brand version={version} compact={view !== 'discovering' && view !== 'models'} />
     {view === 'discovering' && <Text color="yellow">Scanning configured model folders…</Text>}
     {view === 'models' && <Box flexDirection="column"><Text bold>Models</Text>{discoveryError && <Text color="red">{discoveryError}</Text>}{modelRows.length > 0 ? modelRows : <Text color="yellow">No profile-matched models found.</Text>}<Box marginTop={1}><Text>Server  127.0.0.1:{serverSettings.port} · auth {serverSettings.auth.mode === 'file' ? 'bearer' : 'off'} · model {serverSettings.alias}</Text></Box><Box marginTop={1}><Text><Key>↑/↓</Key> select  <Key>enter</Key> details  <Key>c</Key> configure server  <Key>a</Key> add folder  <Key>r</Key> rescan  <Key>q</Key> quit</Text></Box></Box>}
     {view === 'add-root' && <Box flexDirection="column"><Text bold>Add model folder</Text><Text>Path: <Text color="cyan">{pathInput}</Text><Text inverse> </Text></Text><Text dimColor>Enter to scan · Esc to cancel</Text></Box>}

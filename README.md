@@ -27,15 +27,8 @@ tess-server
 
 The TUI searches common model folders on internal and attached storage. Select a supported model, choose a context window, verify the files, and press `s` to start the server.
 
-The Silicon mark is the default launch identity. To preview the other terminal treatments:
-
-```bash
-tess-server --logo big-iron
-tess-server --logo calvin
-tess-server --logo mini
-tess-server --logo classic
-tess-server --logo stream
-```
+The Silicon chip is Tess Server's primary mark. The TUI switches to a compact
+wordmark on deeper screens to preserve working space.
 
 Model weights are not bundled. You must obtain and store GGUF files under their respective licenses.
 
