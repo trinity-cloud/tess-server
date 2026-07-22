@@ -48,7 +48,7 @@ Model weights are not bundled. You must obtain and store GGUF files under their 
 
 ## Supported profiles
 
-The current release candidate includes six profiles:
+The current release includes six profiles:
 
 | Model | Quantization | GGUF size | Memory class | Default context | Available context choices |
 |---|---|---:|---:|---:|---|

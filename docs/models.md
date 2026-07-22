@@ -4,7 +4,7 @@ Tess Server profiles match specific model artifacts to tested operating envelope
 
 Model weights are not included and Tess Server does not download them. You are responsible for obtaining the files lawfully and following each model's license.
 
-## Current release-candidate profiles
+## Current release profiles
 
 | Model | Quantization | GGUF size | Memory class | Default | Context choices |
 |---|---|---:|---:|---:|---|

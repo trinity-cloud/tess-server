@@ -8,4 +8,4 @@ Tess Server provides a guided terminal interface and a local OpenAI-compatible i
 - [Brand system](branding.md) — the persistent Silicon product mark and secondary promotional artwork.
 - [Licensing](../LICENSE) — the boundary between the MIT-licensed TUI, proprietary engine sidecar, third-party software, and separately licensed model weights.
 
-**Current status:** release candidate. Public npm publication is an owner-controlled release action.
+**Current status:** stable release.
