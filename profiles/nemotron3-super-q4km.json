@@ -2,7 +2,7 @@
   "profile_id": "nemotron3-super-q4km",
   "schema_version": 2,
   "engine": {
-    "min_version": "0.1.1",
+    "min_version": "0.1.2",
     "max_version": null
   },
   "model": {

@@ -11,7 +11,7 @@ test('loads all six source profiles with launcher mappings', async () => {
   for (const profile of profiles) {
     assert.match(launcherForProfile(profile.profile_id), /^serve-.+\.sh$/);
     assert.equal(profile.schema_version, 2);
-    assert.equal(profile.engine.min_version, '0.1.1');
+    assert.equal(profile.engine.min_version, '0.1.2');
     assert.ok(profile.expert.context_presets.some(preset => preset.tokens === profile.context.default));
   }
   const laguna = profiles.find(profile => profile.profile_id === 'laguna-s21-q4km-dflash');
