@@ -14,10 +14,7 @@ CTX=${CTX:-16384}; NP=${NP:-1}
 [ -z "${BATCH+x}" ] || tess_die "BATCH is locked at 2048 for Laguna S.2"
 tess_require_uint CTX "$CTX"
 case "$CTX" in
-  8192|16384|32768) ;;
-  65536) tess_die "64K Laguna qualification is pending; use 32768 or lower" ;;
-  131072) tess_die "128K begins after the 64K Laguna gate passes" ;;
-  262144) tess_die "Full trained-context Laguna qualification is pending" ;;
+  8192|16384|32768|65536|131072|262144) ;;
   *) tess_die "unsupported Laguna context; choose 8192, 16384, 32768, 65536, 131072, or 262144" ;;
 esac
 BATCH=2048; UB=2048
@@ -26,7 +23,6 @@ export GGML_METAL_FA_GQA_NQ=${GGML_METAL_FA_GQA_NQ:-2}
 tess_profile_begin laguna-s21-q4km-dflash
 tess_verify_payload_file "$CHAT_TEMPLATE_REL"
 tess_require_single_slot "$NP"
-tess_mark_custom CTX "$CTX" 16384
 
 if [ "${PRINT_CONFIG:-0}" = 1 ]; then
   tess_print_effective_config "model=$(basename -- "$MODEL")" "draft=$(basename -- "$DRAFT_MODEL")" "context=$CTX" "batch=$BATCH" "ubatch=$UB" "slots=$NP" "kv_type=f16" "speculation=dflash" "n_max=15" "p_min=0.7" "host=127.0.0.1" "port=$PORT" "alias=$ALIAS" "auth=$TESS_AUTH_MODE"

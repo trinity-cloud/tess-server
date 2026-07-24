@@ -25,4 +25,7 @@ test('loads all six source profiles with launcher mappings', async () => {
     bytes: 2233764224,
     sha256: '2ee8aa30338d6599bc7a8ce008cc57c56f2c2b2fdc21f6db9ecda203c751bfd4',
   }]);
+  assert.equal(laguna?.context.qualified, 262144);
+  assert.equal(laguna?.context.validated_prompt, 261856);
+  assert.ok(laguna?.expert.context_presets.every(preset => preset.availability !== 'qualification-pending'));
 });

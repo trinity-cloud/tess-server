@@ -66,13 +66,13 @@ This is an end-product comparison, not a kernel-only microbenchmark. Tess uses t
 - Tess-4-35B-A3B uses its managed Q4 MTP configuration in Tess; stock is target-only because stock rejects the release container's additional draft-tensor inventory.
 - Tencent Hy3 uses its single-token MTP configuration in both builds.
 - NVIDIA Nemotron-3-Super and MiniMax-M2.7 use the same target GGUF in both builds.
-- Laguna uses 32K context because a 24,576-token prompt cannot fit its 16K default; 32K is labeled experimental in the release profile.
+- Laguna uses 32K context because a 24,576-token prompt cannot fit its 16K default. The later July 24 native-context matrix qualified 32K through the full 256K trained window; it does not retroactively change this July 21 performance bracket.
 
 The stock Tess-4 phase uses the standard Q8_0 target container. A separate byte audit hashes every shared tensor in the stock and Tess containers: all 733 target tensors are byte-identical, while the Tess container adds 23 draft-only tensors.
 
 ## Correctness scope
 
-DeepSeek-V4-Flash, Tess-4-35B-A3B, Nemotron-3-Super, MiniMax-M2.7, and Hy3 return all five literal recall values in all three phases. Laguna completes all 1,024 requested tokens but misses a recall value in both its support-only reference and Tess, so its row is throughput evidence rather than a long-context quality claim.
+DeepSeek-V4-Flash, Tess-4-35B-A3B, Nemotron-3-Super, MiniMax-M2.7, and Hy3 return all five literal recall values in all three phases. Laguna completes all 1,024 requested tokens but misses a recall value in both its support-only reference and Tess, so this historical row remains throughput evidence rather than a long-context quality claim. A separate July 24 qualification matrix with unambiguous delimited facts passes five-position recall at every Laguna preset through 256K; see [Laguna context qualification](laguna-context-qualification.md).
 
 Stock and Tess output-token hashes differ for all six rows. These charts therefore make no cross-engine bit-identity claim. That is separate from Tess's per-optimization correctness gates: different engine revisions and managed product configurations can choose different temperature-zero continuations on this workload.
 

@@ -8,7 +8,7 @@ Model weights are not included and Tess Server does not download them. You are r
 
 | Model | Quantization | GGUF size | Memory class | Default | Context choices |
 |---|---|---:|---:|---:|---|
-| **Laguna S.2** | Q4_K_M + BF16 DFlash | 63.6 GiB + 2.1 GiB draft | 128 GiB | 16K | 8K, 16K; experimental 32K; 64K, 128K, and 256K qualification pending |
+| **Laguna S.2** | Q4_K_M + BF16 DFlash | 63.6 GiB + 2.1 GiB draft | 128 GiB | 16K | 8K, 16K, 32K, 64K, 128K, 256K |
 | **Tess-4-35B-A3B** (Qwen3.6-35B-A3B base) | Tess Q8/Q4 build | 35.2 GiB | 64 GiB | 128K | 32K, 64K, 128K, 256K; 512K and 1M qualification pending |
 | **NVIDIA Nemotron-3-Super-120B-A12B** | UD-Q4_K_M | 76.9 GiB | 128 GiB | 32K | 32K, 64K, 128K, 256K; experimental 512K and 1M |
 | **DeepSeek-V4-Flash** | UD-IQ3_XXS | 95.9 GiB | 128 GiB | 32K | 4K, 8K, 16K, 32K, 64K, 128K, 256K; 512K and 1M qualification pending |
@@ -18,6 +18,8 @@ Model weights are not included and Tess Server does not download them. You are r
 Memory class describes the qualified hardware tier, not a promise that the model consumes the full amount at every context.
 
 The verified Laguna profile carries Poolside's current chat template and applies it automatically. Users only need the exact Q4_K_M target and BF16 DFlash GGUF files; the importance matrix and alternate quantizations are not runtime dependencies. The packaged template preserves Laguna's native reasoning and tagged tool-call protocol so OpenAI-compatible clients receive structured tool calls instead of raw markup.
+
+Laguna's six native presets are qualified through the full 262,144-token trained window. The July 24 matrix used exact near-full prompts at every preset, generated 256 tokens, recovered all five facts placed near 10/30/50/70/90 percent of the prompt, returned a structured `Read` tool call without raw tagged markup, exercised prompt-cache reuse and cancellation recovery, and verified clean behavior immediately below and at the context wall. See [Laguna context qualification](laguna-context-qualification.md).
 
 ## Profile labels
 

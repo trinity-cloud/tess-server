@@ -26,7 +26,7 @@ test('resolves context-owned ubatch policies', () => {
   assert.equal(resolveProfileConfiguration(profile('minimax-m27-iq4xs'), {context: 196608}).ubatch, 2048);
 });
 
-test('rejects non-presets and qualification-pending choices', () => {
+test('rejects non-presets and qualification-pending choices while allowing qualified Laguna contexts', () => {
   assert.throws(() => resolveProfileConfiguration(profile('hy3-iq2m'), {context: 24576}), /not available/);
   const deepSeek1m = resolveProfileConfiguration(profile('dsv4-dspark'), {context: 1048576});
   assert.equal(deepSeek1m.startable, false);
@@ -34,8 +34,11 @@ test('rejects non-presets and qualification-pending choices', () => {
   const balanced = resolveProfileConfiguration(profile('minimax-m27-iq4xs'), {kvQuality: 'balanced'});
   assert.equal(balanced.startable, false);
   const laguna64k = resolveProfileConfiguration(profile('laguna-s21-q4km-dflash'), {context: 65536});
-  assert.equal(laguna64k.startable, false);
-  assert.match(laguna64k.rejection ?? '', /64K/);
+  assert.equal(laguna64k.startable, true);
+  const laguna256k = resolveProfileConfiguration(profile('laguna-s21-q4km-dflash'), {context: 262144});
+  assert.equal(laguna256k.startable, true);
+  assert.equal(laguna256k.ubatch, 2048);
+  assert.equal(laguna256k.runtimeLabel, 'verified');
 });
 
 test('classifies allowlisted expert deltas as custom', () => {

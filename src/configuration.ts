@@ -86,8 +86,14 @@ export function resolveProfileConfiguration(profile: ProfileDescriptor, override
   let startable = preset.availability !== 'qualification-pending';
   let rejection = startable ? undefined : preset.unavailable_reason ?? `${preset.label} is qualification-pending`;
 
-  if (context !== profile.context.default) {
-    deltas.push(`context=${context} (verified ${profile.context.default})`);
+  const qualifiedCeiling = profile.context.qualified ?? profile.context.default;
+  const qualifiedPreset = (
+    preset.availability !== 'qualification-pending'
+    && !preset.experimental
+    && context <= qualifiedCeiling
+  );
+  if (context !== profile.context.default && !qualifiedPreset) {
+    deltas.push(`context=${context} (qualified ceiling ${qualifiedCeiling})`);
   }
   if (preset.experimental) {
     warnings.push(`${preset.label} is experimental and does not inherit verified-default performance claims.`);

@@ -29,10 +29,10 @@
   "context": {
     "trained": 262144,
     "engine_allocatable": 262144,
-    "validated": 16384,
-    "qualified": 16384,
-    "validated_prompt": 16384,
-    "validated_generation": 128,
+    "validated": 262144,
+    "qualified": 262144,
+    "validated_prompt": 261856,
+    "validated_generation": 256,
     "default": 16384
   },
   "runtime": {
@@ -60,20 +60,22 @@
     "wired_limit_note": null
   },
   "evidence": [
-    "laguna-publisher-refresh-runtime-smoke-2026-07-23"
+    "laguna-publisher-refresh-runtime-smoke-2026-07-23",
+    "laguna-native-context-matrix-2026-07-24"
   ],
   "limitations": [
-    "The 32K tier is available as an experimental release-qualification candidate; deeper native windows remain gated.",
+    "All six native context presets passed near-full recall, structured tool-call, context-wall, recovery, and memory qualification on the 128 GiB release host.",
+    "The full 256K gate was exercised with iogpu.wired_limit_mb=129024; peak system wired was 88.1 GiB and 18.6 GiB of reclaimable memory remained.",
     "Long speculative generations can encounter rare deterministic near-tie differences outside the recorded bit-identity probe lengths; every accepted draft token is still verified by the target model."
   ],
   "expert": {
     "context_presets": [
       {"tokens": 8192, "label": "8K", "group": "Native", "batch": 2048, "ubatch": 2048},
       {"tokens": 16384, "label": "16K", "group": "Native", "recommended": true, "batch": 2048, "ubatch": 2048},
-      {"tokens": 32768, "label": "32K", "group": "Native", "experimental": true, "batch": 2048, "ubatch": 2048},
-      {"tokens": 65536, "label": "64K", "group": "Native", "availability": "qualification-pending", "unavailable_reason": "64K release qualification is pending", "batch": 2048, "ubatch": 2048},
-      {"tokens": 131072, "label": "128K", "group": "Native", "availability": "qualification-pending", "unavailable_reason": "128K begins after the 64K gate passes", "batch": 2048, "ubatch": 2048},
-      {"tokens": 262144, "label": "256K", "group": "Native · YaRN", "availability": "qualification-pending", "unavailable_reason": "Full trained-context qualification is pending", "batch": 2048, "ubatch": 2048}
+      {"tokens": 32768, "label": "32K", "group": "Native", "batch": 2048, "ubatch": 2048},
+      {"tokens": 65536, "label": "64K", "group": "Native", "batch": 2048, "ubatch": 2048},
+      {"tokens": 131072, "label": "128K", "group": "Native", "batch": 2048, "ubatch": 2048},
+      {"tokens": 262144, "label": "256K", "group": "Native · YaRN", "batch": 2048, "ubatch": 2048}
     ]
   }
 }
