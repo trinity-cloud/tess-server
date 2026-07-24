@@ -11,6 +11,18 @@ test('loads all six source profiles with launcher mappings', async () => {
   for (const profile of profiles) {
     assert.match(launcherForProfile(profile.profile_id), /^serve-.+\.sh$/);
     assert.equal(profile.schema_version, 2);
+    assert.equal(profile.engine.min_version, '0.1.1');
     assert.ok(profile.expert.context_presets.some(preset => preset.tokens === profile.context.default));
   }
+  const laguna = profiles.find(profile => profile.profile_id === 'laguna-s21-q4km-dflash');
+  assert.deepEqual(laguna?.shards, [{
+    name: 'laguna-s-2.1-Q4_K_M.gguf',
+    bytes: 68248759648,
+    sha256: 'e163b2c98908809a71245d6bb68b2226994d9969cb2a438eccb72196a1c4147a',
+  }]);
+  assert.deepEqual(laguna?.draft, [{
+    name: 'laguna-s-2.1-DFlash-BF16.gguf',
+    bytes: 2233764224,
+    sha256: '2ee8aa30338d6599bc7a8ce008cc57c56f2c2b2fdc21f6db9ecda203c751bfd4',
+  }]);
 });

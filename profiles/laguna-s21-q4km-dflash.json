@@ -2,7 +2,7 @@
   "profile_id": "laguna-s21-q4km-dflash",
   "schema_version": 2,
   "engine": {
-    "min_version": "0.1.0",
+    "min_version": "0.1.1",
     "max_version": null
   },
   "model": {
@@ -15,15 +15,15 @@
   "shards": [
     {
       "name": "laguna-s-2.1-Q4_K_M.gguf",
-      "bytes": 75173103200,
-      "sha256": "7da520c5f44bc3c79d4eeebfd1151ba7114c5d7568e72a995638417093c5753f"
+      "bytes": 68248759648,
+      "sha256": "e163b2c98908809a71245d6bb68b2226994d9969cb2a438eccb72196a1c4147a"
     }
   ],
   "draft": [
     {
       "name": "laguna-s-2.1-DFlash-BF16.gguf",
-      "bytes": 2233764000,
-      "sha256": "24614292a4477f3ae5203c3875edcde0bc219f02616a9c9f65791e29b18a67ee"
+      "bytes": 2233764224,
+      "sha256": "2ee8aa30338d6599bc7a8ce008cc57c56f2c2b2fdc21f6db9ecda203c751bfd4"
     }
   ],
   "context": {
@@ -60,8 +60,7 @@
     "wired_limit_note": null
   },
   "evidence": [
-    "release-qualification-2026-07-21",
-    "laguna-context-and-speculation-qualification-2026-07"
+    "laguna-publisher-refresh-runtime-smoke-2026-07-23"
   ],
   "limitations": [
     "The 32K tier is available as an experimental release-qualification candidate; deeper native windows remain gated.",
