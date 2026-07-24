@@ -42,12 +42,13 @@ STAGE_ROOT=$(mktemp -d /tmp/tess-stage.XXXXXX)
 VERIFY_ROOT=
 trap 'rm -rf "$STAGE_ROOT" ${VERIFY_ROOT:+"$VERIFY_ROOT"}' EXIT
 STAGE="$STAGE_ROOT/$NAME"
-mkdir -p "$STAGE/bin" "$STAGE/profiles" "$STAGE/scripts/serve" "$STAGE/share/tess-server/licenses"
+mkdir -p "$STAGE/bin" "$STAGE/profiles" "$STAGE/scripts/serve" "$STAGE/share/tess-server/licenses" "$STAGE/share/tess-server/templates"
 LICENSE_FILES=(
   cpp-httplib-MIT.txt
   llama.cpp-MIT.txt
   miniaudio-MIT-0.txt
   nlohmann-json-MIT.txt
+  poolside-OpenMDW-1.1.txt
   sheredom-subprocess-UNLICENSE.txt
   stb-MIT.txt
 )
@@ -65,13 +66,14 @@ cp "$REPO"/scripts/serve/*.sh "$STAGE/scripts/serve/"
 cp "$PROVENANCE"                     "$STAGE/share/tess-server/build-provenance.json"
 cp "$REPO/README.md"                 "$STAGE/share/tess-server/README.md"
 cp "$REPO/THIRD_PARTY_NOTICES.md"    "$STAGE/share/tess-server/THIRD_PARTY_NOTICES"
+cp "$REPO/templates/laguna-s21-chat-template.jinja" "$STAGE/share/tess-server/templates/"
 for license_file in "${LICENSE_FILES[@]}"; do
   [ -f "$REPO/licenses/$license_file" ] || { echo "FAIL: missing license text: $license_file" >&2; exit 1; }
   cp "$REPO/licenses/$license_file" "$STAGE/share/tess-server/licenses/"
 done
 cp "$LICENSE_SOURCE"                 "$STAGE/share/tess-server/LICENSE"
 chmod 755 "$STAGE/bin/tess-server" "$STAGE/scripts/verify-profile.sh" "$STAGE/scripts/install.sh" "$STAGE/scripts/rollback.sh" "$STAGE/scripts/uninstall.sh" "$STAGE"/scripts/serve/*.sh
-chmod 644 "$STAGE/bin/default.metallib" "$STAGE/scripts/profile-common.sh" "$STAGE/scripts/install-common.sh" "$STAGE"/profiles/*.json "$STAGE"/share/tess-server/licenses/*.txt
+chmod 644 "$STAGE/bin/default.metallib" "$STAGE/scripts/profile-common.sh" "$STAGE/scripts/install-common.sh" "$STAGE"/profiles/*.json "$STAGE"/share/tess-server/licenses/*.txt "$STAGE"/share/tess-server/templates/*.jinja
 
 # --- product/static closure ---
 file "$STAGE/bin/tess-server" | grep -q 'Mach-O 64-bit executable arm64' || { echo "FAIL: executable is not thin arm64" >&2; exit 1; }
@@ -105,10 +107,10 @@ fi
 if strings - "$STAGE/bin/default.metallib" | grep -cE "/Users/[^/[:space:]]+" | grep -qv '^0$'; then
   echo "WARN: personal paths in metallib"; fail=1
 fi
-if find "$STAGE" -type f \( -name "*.json" -o -name "*.md" -o -name "*.sh" -o -name "*.txt" \) -print0 | xargs -0 grep -nE '/Users/[^/[:space:]]+' > "$STAGE_ROOT/text-pathleaks.txt" 2>/dev/null; then
+if find "$STAGE" -type f \( -name "*.json" -o -name "*.jinja" -o -name "*.md" -o -name "*.sh" -o -name "*.txt" \) -print0 | xargs -0 grep -nE '/Users/[^/[:space:]]+' > "$STAGE_ROOT/text-pathleaks.txt" 2>/dev/null; then
   echo "WARN: personal paths in staged text:"; head -5 "$STAGE_ROOT/text-pathleaks.txt"; fail=1
 fi
-if find "$STAGE" -type f \( -name "*.json" -o -name "*.md" -o -name "*.sh" -o -name "*.txt" \) -print0 | xargs -0 grep -nE 'AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{20,}|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY' > "$STAGE_ROOT/secrets.txt" 2>/dev/null; then
+if find "$STAGE" -type f \( -name "*.json" -o -name "*.jinja" -o -name "*.md" -o -name "*.sh" -o -name "*.txt" \) -print0 | xargs -0 grep -nE 'AKIA[0-9A-Z]{16}|gh[pousr]_[A-Za-z0-9_]{20,}|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY' > "$STAGE_ROOT/secrets.txt" 2>/dev/null; then
   echo "FAIL: credential-like material in staged text"; fail=1
 fi
 if strings - "$STAGE/bin/tess-server" | grep -E "kernel void kernel_" > "$STAGE_ROOT/metal-source.txt"; then

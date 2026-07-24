@@ -11,6 +11,7 @@ Tess Server is a proprietary distribution built on open-source foundations. The 
 | [stb](https://github.com/nothings/stb) | MIT / public domain | Image utilities (vendored) |
 | [sheredom subprocess.h](https://github.com/sheredom/subprocess.h) | Unlicense / public domain | Local subprocess support used by server model/tool plumbing |
 | [miniaudio](https://github.com/mackron/miniaudio) | MIT-0 / public domain | Audio decoding utilities linked through the multimodal server support library |
+| [Poolside Laguna S 2.1 chat template](https://huggingface.co/poolside/Laguna-S-2.1-GGUF/blob/main/chat_template.jinja) | OpenMDW-1.1 | Model-authored prompt, reasoning, and tool-call serialization for the verified Laguna profile |
 
 The selected complete license texts are reproduced in the release archive under `share/tess-server/licenses/`. The frozen build configuration, vendored include graph, static binary symbols, and Mach-O dependency closure are checked against this list before release.
 

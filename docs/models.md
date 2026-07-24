@@ -17,6 +17,8 @@ Model weights are not included and Tess Server does not download them. You are r
 
 Memory class describes the qualified hardware tier, not a promise that the model consumes the full amount at every context.
 
+The verified Laguna profile carries Poolside's current chat template and applies it automatically. Users only need the exact Q4_K_M target and BF16 DFlash GGUF files; the importance matrix and alternate quantizations are not runtime dependencies. The packaged template preserves Laguna's native reasoning and tagged tool-call protocol so OpenAI-compatible clients receive structured tool calls instead of raw markup.
+
 ## Profile labels
 
 - **Verified** — the packaged engine, model files, profile, and selected settings match a qualified combination.
