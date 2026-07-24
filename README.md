@@ -46,7 +46,7 @@ And the results we did not win: stock is 6% faster on Tess-4 prefill, 4% faster 
 
 Two of the six shipped profiles do not load in official stock llama.cpp at all — the architecture support lives in the Tess Server engine:
 
-- **Laguna S.2 (118B-A8B)** with its DFlash speculative drafter. Against a reference build patched only for model support, the packaged engine decodes **67.58 tok/s versus 13.45 — 5.03x** — at the same 24K-token depth.
+- **Laguna S.2 (118B-A8B)** with its DFlash speculative drafter. The July 21 benchmark of the initial publisher artifact measured **67.58 tok/s versus 13.45 — 5.03x** against a reference build patched only for model support at the same 24K-token depth. The refreshed publisher GGUF profiled in Tess Server 0.1.1 has passed runtime qualification but is not represented by that historical throughput result.
 - **Tencent Hy3 (298.8B)**, a 192-expert mixture-of-experts model served whole on a single 128 GiB Mac.
 
 Depth is the other frontier. MiniMax-M2.7 serves its **full 196,608-token trained context** on one M4 Max, and DeepSeek-V4-Flash is profile-qualified to 256K.
@@ -78,7 +78,7 @@ The current release includes six profiles:
 
 | Model | Quantization | GGUF size | Memory class | Default context | Available context choices |
 |---|---|---:|---:|---:|---|
-| **Laguna S.2** | Q4_K_M + BF16 DFlash | 70.0 GiB + 2.1 GiB draft | 128 GiB | 16K | 8K, 16K; experimental 32K; 64K, 128K, and 256K pending |
+| **Laguna S.2** | Q4_K_M + BF16 DFlash | 63.6 GiB + 2.1 GiB draft | 128 GiB | 16K | 8K, 16K; experimental 32K; 64K, 128K, and 256K pending |
 | **Tess-4-35B-A3B** (Qwen3.6-35B-A3B base) | Tess Q8/Q4 build | 35.2 GiB | 64 GiB | 128K | 32K, 64K, 128K, 256K; 512K and 1M pending |
 | **NVIDIA Nemotron-3-Super-120B-A12B** | UD-Q4_K_M | 76.9 GiB | 128 GiB | 32K | 32K, 64K, 128K, 256K; experimental 512K and 1M |
 | **DeepSeek-V4-Flash** | UD-IQ3_XXS | 95.9 GiB | 128 GiB | 32K | 4K, 8K, 16K, 32K, 64K, 128K, 256K; 512K and 1M pending |

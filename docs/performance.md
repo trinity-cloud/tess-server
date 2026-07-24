@@ -1,6 +1,6 @@
 # Performance and methodology
 
-This page reports the July 21, 2026 comparison between the packaged Tess Server `0.1.0-rc.2` engine and official stock llama.cpp `b10004` (`7cbd61002`). It describes measured product behavior without disclosing proprietary implementation details.
+This page reports the July 21, 2026 comparison between the packaged Tess Server `0.1.0-rc.2` engine and official stock llama.cpp `b10004` (`7cbd61002`). It describes measured product behavior without disclosing proprietary implementation details. The Laguna row uses the initial publisher GGUF profiled in 0.1.0; the refreshed publisher artifact profiled in 0.1.1 is not represented by these historical throughput figures.
 
 ![Stock llama.cpp versus Tess Server decode throughput](assets/performance/stock-vs-tess-decode.svg)
 
