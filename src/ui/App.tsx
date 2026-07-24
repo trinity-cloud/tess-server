@@ -458,7 +458,10 @@ export function App({profiles, payloadRoot, initialModelRoots, initialServerSett
 
   const expertValue = (field: ExpertField): string => {
     if (!resolved || !selected) return '';
-    if (field === 'context') return `${resolved.preset.label}${resolved.preset.experimental ? ' · Experimental' : ''}`;
+    if (field === 'context') {
+      const status = resolved.preset.availability === 'qualification-pending' ? ' · Untested' : resolved.preset.experimental ? ' · Experimental' : '';
+      return `${resolved.preset.label}${status}`;
+    }
     if (field === 'speculation') return resolved.speculation ?? '';
     if (field === 'draft_depth') return String(resolved.draftDepth ?? '');
     if (field === 'p_min') return String(resolved.pMin ?? '');
@@ -520,6 +523,7 @@ export function App({profiles, payloadRoot, initialModelRoots, initialServerSett
       {resolved.preset.requires_wired_limit_mb && <Box flexDirection="column"><Text color="yellow">Requires GPU wired limit: {resolved.preset.requires_wired_limit_mb.toLocaleString()} MiB</Text><Text>Run once per boot: <Text color="cyan">sudo sysctl iogpu.wired_limit_mb={resolved.preset.requires_wired_limit_mb}</Text></Text><Text dimColor>Tess Server never runs this command or requests root.</Text></Box>}
       {resolved.rejection && <Text color="red">REJECTED: {resolved.rejection}</Text>}
       {resolved.deltas.map(delta => <Text key={delta} color="yellow">• {delta}</Text>)}
+      {resolved.warnings.map(warning => <Text key={warning} color="yellow">• {warning}</Text>)}
       {selected.profile.limitations.slice(0, 2).map(limitation => <Text key={limitation} dimColor>• {limitation}</Text>)}
       <Box marginTop={1}><Text><Key>←/→</Key> context  <Key>e</Key> expert options  <Key>p</Key> preview  <Key>s</Key> start  <Key>v</Key> verify  <Key>b</Key> back</Text></Box>
     </Box> : <Box flexDirection="column">

@@ -83,20 +83,26 @@ export function resolveProfileConfiguration(profile: ProfileDescriptor, override
   const preset = contextPreset(profile, context);
   const deltas: string[] = [];
   const warnings: string[] = [];
-  let startable = preset.availability !== 'qualification-pending';
-  let rejection = startable ? undefined : preset.unavailable_reason ?? `${preset.label} is qualification-pending`;
+  let startable = true;
+  let rejection: string | undefined;
+  const qualificationPending = preset.availability === 'qualification-pending';
 
   const qualifiedCeiling = profile.context.qualified ?? profile.context.default;
   const qualifiedPreset = (
-    preset.availability !== 'qualification-pending'
+    !qualificationPending
     && !preset.experimental
     && context <= qualifiedCeiling
   );
   if (context !== profile.context.default && !qualifiedPreset) {
     deltas.push(`context=${context} (qualified ceiling ${qualifiedCeiling})`);
   }
-  if (preset.experimental) {
-    warnings.push(`${preset.label} is experimental and does not inherit verified-default performance claims.`);
+  if (qualificationPending) {
+    const reason = preset.unavailable_reason ?? `${preset.label} has not been qualified`;
+    warnings.push(`${reason}. Launch is allowed, but compatibility, memory, correctness, quality, and performance are not claimed for this context.`);
+  } else if (preset.experimental) {
+    warnings.push(`${preset.label} is experimental and has not been qualified. Launch is allowed, but compatibility, memory, correctness, quality, and performance are not claimed for this context.`);
+  } else if (context > qualifiedCeiling) {
+    warnings.push(`${preset.label} exceeds the profile's qualified ${qualifiedCeiling.toLocaleString()}-token ceiling. Launch is allowed, but compatibility, memory, correctness, quality, and performance are not claimed for this context.`);
   }
 
   let speculation = profile.expert.speculation?.default;

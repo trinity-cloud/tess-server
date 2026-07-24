@@ -26,11 +26,31 @@ test('resolves context-owned ubatch policies', () => {
   assert.equal(resolveProfileConfiguration(profile('minimax-m27-iq4xs'), {context: 196608}).ubatch, 2048);
 });
 
-test('rejects non-presets and qualification-pending choices while allowing qualified Laguna contexts', () => {
+test('keeps every configured context selectable and warns instead of blocking untested tiers', () => {
   assert.throws(() => resolveProfileConfiguration(profile('hy3-iq2m'), {context: 24576}), /not available/);
+  for (const candidate of profiles) {
+    for (const preset of candidate.expert.context_presets) {
+      const resolved = resolveProfileConfiguration(candidate, {context: preset.tokens});
+      assert.equal(resolved.startable, true, `${candidate.profile_id} ${preset.label} should remain selectable`);
+      const qualified = preset.availability !== 'qualification-pending'
+        && !preset.experimental
+        && preset.tokens <= (candidate.context.qualified ?? candidate.context.default);
+      if (!qualified) {
+        assert.match(resolved.warnings.join('\n'), /Launch is allowed/, `${candidate.profile_id} ${preset.label} should warn`);
+      }
+    }
+  }
   const deepSeek1m = resolveProfileConfiguration(profile('dsv4-dspark'), {context: 1048576});
-  assert.equal(deepSeek1m.startable, false);
-  assert.match(deepSeek1m.rejection ?? '', /512K|1M/);
+  assert.equal(deepSeek1m.startable, true);
+  assert.equal(deepSeek1m.runtimeLabel, 'custom');
+  assert.match(deepSeek1m.warnings.join('\n'), /has not been tested.*Launch is allowed/);
+  const tess512k = resolveProfileConfiguration(profile('qwen36-a3b-q8-q4mtp'), {context: 524288});
+  assert.equal(tess512k.startable, true);
+  assert.equal(tess512k.runtimeLabel, 'verified');
+  const tess1m = resolveProfileConfiguration(profile('qwen36-a3b-q8-q4mtp'), {context: 1010000});
+  assert.equal(tess1m.startable, true);
+  assert.equal(tess1m.runtimeLabel, 'custom');
+  assert.match(tess1m.warnings.join('\n'), /has not been tested.*Launch is allowed/);
   const balanced = resolveProfileConfiguration(profile('minimax-m27-iq4xs'), {kvQuality: 'balanced'});
   assert.equal(balanced.startable, false);
   const laguna64k = resolveProfileConfiguration(profile('laguna-s21-q4km-dflash'), {context: 65536});

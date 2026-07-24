@@ -28,4 +28,12 @@ test('loads all six source profiles with launcher mappings', async () => {
   assert.equal(laguna?.context.qualified, 262144);
   assert.equal(laguna?.context.validated_prompt, 261856);
   assert.ok(laguna?.expert.context_presets.every(preset => preset.availability !== 'qualification-pending'));
+
+  const tess = profiles.find(profile => profile.profile_id === 'qwen36-a3b-q8-q4mtp');
+  assert.equal(tess?.context.qualified, 524288);
+  assert.equal(tess?.context.validated_prompt, 524000);
+  assert.equal(tess?.context.validated_generation, 256);
+  assert.deepEqual(tess?.expert.context_presets.map(preset => preset.tokens), [32768, 65536, 131072, 262144, 524288, 1010000]);
+  assert.equal(tess?.expert.context_presets.find(preset => preset.tokens === 524288)?.availability, undefined);
+  assert.equal(tess?.expert.context_presets.find(preset => preset.tokens === 1010000)?.availability, 'qualification-pending');
 });

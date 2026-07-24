@@ -23,9 +23,10 @@
   "context": {
     "trained": 262144,
     "engine_allocatable": 1010000,
-    "validated": 107000,
-    "qualified": 107000,
-    "validated_prompt": 107000,
+    "validated": 524288,
+    "qualified": 524288,
+    "validated_prompt": 524000,
+    "validated_generation": 256,
     "default": 131072
   },
   "runtime": {
@@ -50,11 +51,13 @@
   },
   "evidence": [
     "release-qualification-2026-07-21",
-    "long-session-qualification-2026-07"
+    "long-session-qualification-2026-07",
+    "native-context-anchor-262144-2026-07-24",
+    "yarn-factor-2-context-anchor-524288-2026-07-24"
   ],
   "limitations": [
-    "Deepest live-session depth exercised before RC gating: ~107k tokens; full 262,144-token ingest remains a release gate.",
-    "Open near-tie investigation at multi-thousand-token generations under speculation; bit-identity validated at recorded probe lengths."
+    "Native MTP contexts are qualified through 262,144 tokens; the 524,288-token YaRN factor-2 preset is qualified target-only.",
+    "The selectable 1M YaRN factor-4 preset has not been tested and carries no compatibility, memory, correctness, quality, or performance claim."
   ],
   "expert": {
     "context_presets": [
@@ -62,8 +65,8 @@
       {"tokens": 65536, "label": "64K", "group": "Native", "ubatch": 2048},
       {"tokens": 131072, "label": "128K", "group": "Native", "recommended": true, "ubatch": 2048},
       {"tokens": 262144, "label": "256K", "group": "Native", "ubatch": 2048},
-      {"tokens": 524288, "label": "512K", "group": "Extended · YaRN", "experimental": true, "availability": "qualification-pending", "unavailable_reason": "512K YaRN target-only qualification is pending", "ubatch": 2048, "speculation": "off", "rope": {"type": "yarn", "factor": 2, "original_context": 262144}},
-      {"tokens": 1010000, "label": "1M", "group": "Extended · YaRN", "experimental": true, "availability": "qualification-pending", "unavailable_reason": "1M begins after the 512K target-only gate passes", "ubatch": 2048, "speculation": "off", "rope": {"type": "yarn", "factor": 4, "original_context": 262144}}
+      {"tokens": 524288, "label": "512K", "group": "Extended · YaRN", "ubatch": 2048, "speculation": "off", "rope": {"type": "yarn", "factor": 2, "original_context": 262144}},
+      {"tokens": 1010000, "label": "1M", "group": "Extended · YaRN", "experimental": true, "availability": "qualification-pending", "unavailable_reason": "1M YaRN factor-4 has not been tested", "ubatch": 2048, "speculation": "off", "rope": {"type": "yarn", "factor": 4, "original_context": 262144}}
     ]
   }
 }
