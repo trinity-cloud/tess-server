@@ -49,7 +49,7 @@ Two of the six shipped profiles do not load in official stock llama.cpp at all �
 - **Laguna S.2 (118B-A8B)** with its DFlash speculative drafter. The July 21 benchmark of the initial publisher artifact measured **67.58 tok/s versus 13.45 — 5.03x** against a reference build patched only for model support at the same 24K-token depth. The refreshed publisher GGUF profiled in Tess Server 0.1.1 has passed runtime qualification but is not represented by that historical throughput result.
 - **Tencent Hy3 (298.8B)**, a 192-expert mixture-of-experts model served whole on a single 128 GiB Mac.
 
-Depth is the other frontier. MiniMax-M2.7 serves its **full 196,608-token trained context** on one M4 Max, while DeepSeek-V4-Flash and Laguna S.2 are profile-qualified to 256K.
+Depth is the other frontier. MiniMax-M2.7 serves its **full 196,608-token trained context** on one M4 Max, DeepSeek-V4-Flash and Laguna S.2 are profile-qualified to 256K, and Tess-4 is qualified through a 512K YaRN target-only tier.
 
 ## Lossless speculative decoding, packaged
 
@@ -63,7 +63,7 @@ Large-model serving on a Mac has real failure modes: out-of-memory panics, silen
 
 - Discovers profiled and unprofiled GGUF models under `~/models`, `~/Models`, and `models` or `Models` folders on attached volumes, plus any folder you add from the TUI or with `--model-root`.
 - Verifies model files against hash-bound profiles before the first launch — a mismatch is a startup error, not a warning.
-- Offers profile-qualified context windows and clearly labels experimental or qualification-pending tiers; memory-critical settings are managed, not guessable.
+- Keeps every configured context choice selectable. Qualified tiers carry the verified claim; experimental or untested tiers display an explicit warning while memory-critical settings remain managed.
 - Groups nearby projector and draft/MTP artifacts under unprofiled primary models, with detected defaults and a complete generic configuration screen for clearly labeled best-effort launches.
 - Shows the effective engine command before launch — nothing is hidden.
 - Starts, monitors, and cleanly shuts down a loopback-only OpenAI-compatible server, so the engine is never left running in the background.
@@ -79,9 +79,9 @@ The current release includes six profiles:
 | Model | Quantization | GGUF size | Memory class | Default context | Available context choices |
 |---|---|---:|---:|---:|---|
 | **Laguna S.2** | Q4_K_M + BF16 DFlash | 63.6 GiB + 2.1 GiB draft | 128 GiB | 16K | 8K, 16K, 32K, 64K, 128K, 256K |
-| **Tess-4-35B-A3B** (Qwen3.6-35B-A3B base) | Tess Q8/Q4 build | 35.2 GiB | 64 GiB | 128K | 32K, 64K, 128K, 256K; 512K and 1M pending |
+| **Tess-4-35B-A3B** (Qwen3.6-35B-A3B base) | Tess Q8/Q4 build | 35.2 GiB | 64 GiB | 128K | 32K, 64K, 128K, 256K, 512K; untested 1M |
 | **NVIDIA Nemotron-3-Super-120B-A12B** | UD-Q4_K_M | 76.9 GiB | 128 GiB | 32K | 32K, 64K, 128K, 256K; experimental 512K and 1M |
-| **DeepSeek-V4-Flash** | UD-IQ3_XXS | 95.9 GiB | 128 GiB | 32K | 4K, 8K, 16K, 32K, 64K, 128K, 256K; 512K and 1M pending |
+| **DeepSeek-V4-Flash** | UD-IQ3_XXS | 95.9 GiB | 128 GiB | 32K | 4K, 8K, 16K, 32K, 64K, 128K, 256K; untested 512K and 1M |
 | **MiniMax-M2.7** | UD-IQ4_XS | 101 GiB | 128 GiB | 70K | 32K, 64K, 70K, 96K, 128K, 160K, 192K |
 | **Tencent Hy3** | IQ2_M | 93.1 GiB | 128 GiB | 32K | 8K, 16K, 32K, 48K; experimental 64K |
 
@@ -162,6 +162,8 @@ Tess Server is built on the MIT-licensed [llama.cpp](https://github.com/ggml-org
 - [Documentation index](docs/index.md)
 - [Supported models](docs/models.md)
 - [Running Tess Server](docs/running.md)
+- [Tess-4 context qualification](docs/tess-4-context-qualification.md)
+- [Laguna context qualification](docs/laguna-context-qualification.md)
 - [Performance and methodology](docs/performance.md)
 - [Brand marks](docs/branding.md)
 

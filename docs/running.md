@@ -30,7 +30,11 @@ details. Unprofiled entries are best-effort and never receive a `VERIFIED` label
 
 Use the left and right arrow keys on model details to select a context window. Press `e` to open any additional profile-owned controls.
 
-The TUI marks the recommended default, experimental choices, and qualification-pending choices for profiled models. Memory-sensitive values are managed automatically and shown in the effective configuration preview.
+The TUI marks the recommended default, experimental choices, and untested or
+qualification-pending choices for profiled models. Every configured context
+choice remains selectable; an untested choice displays a warning and carries no
+compatibility, memory, correctness, quality, or performance claim. Memory-sensitive
+values are managed automatically and shown in the effective configuration preview.
 
 For an unprofiled model, press `e` to open **Generic Model Configuration**. It
 starts with a 4K context, 512 batch/ubatch, F16 K/V cache, all GPU layers,

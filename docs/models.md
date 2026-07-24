@@ -9,9 +9,9 @@ Model weights are not included and Tess Server does not download them. You are r
 | Model | Quantization | GGUF size | Memory class | Default | Context choices |
 |---|---|---:|---:|---:|---|
 | **Laguna S.2** | Q4_K_M + BF16 DFlash | 63.6 GiB + 2.1 GiB draft | 128 GiB | 16K | 8K, 16K, 32K, 64K, 128K, 256K |
-| **Tess-4-35B-A3B** (Qwen3.6-35B-A3B base) | Tess Q8/Q4 build | 35.2 GiB | 64 GiB | 128K | 32K, 64K, 128K, 256K; 512K and 1M qualification pending |
+| **Tess-4-35B-A3B** (Qwen3.6-35B-A3B base) | Tess Q8/Q4 build | 35.2 GiB | 64 GiB | 128K | 32K, 64K, 128K, 256K, 512K; untested 1M |
 | **NVIDIA Nemotron-3-Super-120B-A12B** | UD-Q4_K_M | 76.9 GiB | 128 GiB | 32K | 32K, 64K, 128K, 256K; experimental 512K and 1M |
-| **DeepSeek-V4-Flash** | UD-IQ3_XXS | 95.9 GiB | 128 GiB | 32K | 4K, 8K, 16K, 32K, 64K, 128K, 256K; 512K and 1M qualification pending |
+| **DeepSeek-V4-Flash** | UD-IQ3_XXS | 95.9 GiB | 128 GiB | 32K | 4K, 8K, 16K, 32K, 64K, 128K, 256K; untested 512K and 1M |
 | **MiniMax-M2.7** | UD-IQ4_XS | 101 GiB | 128 GiB | 70K | 32K, 64K, 70K, 96K, 128K, 160K, 192K |
 | **Tencent Hy3** | IQ2_M | 93.1 GiB | 128 GiB | 32K | 8K, 16K, 32K, 48K; experimental 64K |
 
@@ -21,13 +21,24 @@ The verified Laguna profile carries Poolside's current chat template and applies
 
 Laguna's six native presets are qualified through the full 262,144-token trained window. The July 24 matrix used exact near-full prompts at every preset, generated 256 tokens, recovered all five facts placed near 10/30/50/70/90 percent of the prompt, returned a structured `Read` tool call without raw tagged markup, exercised prompt-cache reuse and cancellation recovery, and verified clean behavior immediately below and at the context wall. See [Laguna context qualification](laguna-context-qualification.md).
 
+Tess-4's native MTP configuration is qualified through 262,144 tokens, and its
+target-only YaRN factor-2 configuration is qualified at 524,288 tokens. Each
+configuration class was tested at its longest selectable tier, which qualifies
+the lower tiers using the same runtime policy. The 1M YaRN factor-4 choice remains
+selectable but is explicitly untested. See
+[Tess-4 context qualification](tess-4-context-qualification.md).
+
+Every context choice in this table is selectable. Qualification status changes
+the label and warning—not availability. An untested choice carries no
+compatibility, memory, correctness, quality, or performance claim.
+
 ## Profile labels
 
 - **Verified** — the packaged engine, model files, profile, and selected settings match a qualified combination.
 - **Custom** — a recognized profile is running with an operator-selected deviation from its qualified defaults.
 - **Unprofiled / best effort** — the TUI found a primary GGUF that does not match a packaged profile and launched it with conservative generic settings.
 - **Experimental** — the choice is available for testing but is not part of the profile's ordinary qualification claim.
-- **Qualification pending** — the choice is visible but cannot be started through the public profile until its release gates close.
+- **Untested / qualification pending** — the choice remains selectable, but the TUI warns that it carries no qualification claim.
 
 ## Model discovery
 
@@ -92,4 +103,4 @@ The change lasts until reboot. Tess Server never runs the command, invokes `sudo
 
 The client context limit must not exceed the server window. For long-running agents, set the client's compaction threshold comfortably below the selected server context so the conversation is compacted before reaching the hard ceiling.
 
-Larger context choices increase memory use and can reduce decode speed. The TUI manages sensitive resource settings for each choice and clearly labels experimental tiers.
+Larger context choices increase memory use and can reduce decode speed. The TUI manages sensitive resource settings for each configured choice and clearly labels experimental or untested tiers without blocking them.

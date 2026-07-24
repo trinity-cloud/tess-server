@@ -20,7 +20,11 @@ Profiles are versioned and packaged with the proprietary engine sidecar. The ope
 - `custom` — a recognized profile is running with an allowed operator deviation.
 - `best-effort` — the engine is running outside a packaged profile.
 
-Experimental and qualification-pending choices must remain visibly distinct. The TUI must never silently convert evidence depths into selectable product tiers.
+Experimental and qualification-pending choices must remain visibly distinct.
+Qualification status never blocks a configured context choice: untested contexts
+remain selectable with an explicit warning and no compatibility, memory,
+correctness, quality, or performance claim. The TUI must never silently convert
+evidence depths into a verified product claim.
 
 ## Verification
 
