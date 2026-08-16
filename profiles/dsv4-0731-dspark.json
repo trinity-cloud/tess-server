@@ -1,0 +1,107 @@
+{
+  "profile_id": "dsv4-0731-dspark",
+  "schema_version": 2,
+  "engine": {
+    "min_version": "0.1.4",
+    "max_version": null
+  },
+  "model": {
+    "name": "DeepSeek-V4-Flash-0731",
+    "architecture": "deepseek4",
+    "quant_label": "UD-IQ3_XXS",
+    "total_params": "284B",
+    "active_params": "13B"
+  },
+  "shards": [
+    {
+      "name": "DeepSeek-V4-Flash-0731-UD-IQ3_XXS-00001-of-00004.gguf",
+      "bytes": 5257664,
+      "sha256": "9758eb3d78e1afe8852543931703f4f1cd6fbb07f492d4ed853f5d2f6e43be5a"
+    },
+    {
+      "name": "DeepSeek-V4-Flash-0731-UD-IQ3_XXS-00002-of-00004.gguf",
+      "bytes": 49485728288,
+      "sha256": "afcfd59721d4da86bc3301e16ca624af202d8af3fa3f9fbbfbb04b3b47666cfd"
+    },
+    {
+      "name": "DeepSeek-V4-Flash-0731-UD-IQ3_XXS-00003-of-00004.gguf",
+      "bytes": 49437886752,
+      "sha256": "64eaf514a763597ba7bb50866583d8db5eabbbbce3cb2f616d749af3890155ca"
+    },
+    {
+      "name": "DeepSeek-V4-Flash-0731-UD-IQ3_XXS-00004-of-00004.gguf",
+      "bytes": 4071015712,
+      "sha256": "5df52988c56348a22d15da809e9ac4f0cc59cc1c412347f1481dda4685ce89b2"
+    }
+  ],
+  "draft": [
+    {
+      "name": "dspark-draft-0731.gguf",
+      "bytes": 11315885312,
+      "sha256": "46988149b9f829379a1ddcfeea64dcf0caf4691380b3b5ee7b08aceb667b6fd9"
+    }
+  ],
+  "context": {
+    "trained": 1048576,
+    "engine_allocatable": 1048576,
+    "validated": 262144,
+    "qualified": 262144,
+    "validated_prompt": 258026,
+    "validated_generation": 256,
+    "default": 8192
+  },
+  "runtime": {
+    "batch": 2048,
+    "ubatch": 2048,
+    "kv_type": "dsv4-compressed",
+    "slots": 1,
+    "flash_attention": true,
+    "jinja": true
+  },
+  "speculation": {
+    "type": "draft-dspark",
+    "n_max": 5,
+    "p_min": 0.65,
+    "invariants": [
+      "single-slot"
+    ]
+  },
+  "memory": {
+    "ram_class_gib": 128,
+    "requires_wired_limit_mb": 129024,
+    "wired_limit_note": "This profile requires iogpu.wired_limit_mb=129024. Set it manually once per boot before launch; Tess Server never requests root or changes the limit."
+  },
+  "evidence": [
+    "dsv4-0731-depth-aba-20260801-003752",
+    "dsv4-0731-dspark-acceptance-20260801",
+    "release-qualification-2026-07-21",
+    "long-context-qualification-2026-07"
+  ],
+  "limitations": [
+    "The verified context matrix inherits the Preview artifact's 4K-256K qualification after the 0731 release proved architecture and greedy-output equivalence; DSpark is packaged at 4K/8K and 16K-256K are target-only.",
+    "This profile matches the archived 0731 shard set used by the recorded campaign; later publisher refreshes have different hashes and are unprofiled.",
+    "512K and 1M target-only contexts are selectable but untested; contexts above 32,768 use managed ubatch 512 and manual ubatch overrides are rejected."
+  ],
+  "expert": {
+    "context_presets": [
+      {"tokens": 4096, "label": "4K", "group": "Native", "ubatch": 2048, "requires_wired_limit_mb": 129024},
+      {"tokens": 8192, "label": "8K", "group": "Native", "recommended": true, "ubatch": 2048, "requires_wired_limit_mb": 129024},
+      {"tokens": 16384, "label": "16K", "group": "Native", "ubatch": 2048, "requires_wired_limit_mb": 129024, "speculation": "off"},
+      {"tokens": 32768, "label": "32K", "group": "Native", "ubatch": 2048, "requires_wired_limit_mb": 129024, "speculation": "off"},
+      {"tokens": 65536, "label": "64K", "group": "Native", "ubatch": 512, "requires_wired_limit_mb": 129024, "speculation": "off"},
+      {"tokens": 131072, "label": "128K", "group": "Native", "ubatch": 512, "requires_wired_limit_mb": 129024, "speculation": "off"},
+      {"tokens": 262144, "label": "256K", "group": "Native", "ubatch": 512, "requires_wired_limit_mb": 129024, "speculation": "off"},
+      {"tokens": 524288, "label": "512K", "group": "Extended", "experimental": true, "availability": "qualification-pending", "unavailable_reason": "512K has not been qualified on the 0731 artifact set", "ubatch": 512, "requires_wired_limit_mb": 129024, "speculation": "off"},
+      {"tokens": 1048576, "label": "1M", "group": "Extended", "experimental": true, "availability": "qualification-pending", "unavailable_reason": "1M has not been qualified on the 0731 artifact set", "ubatch": 512, "requires_wired_limit_mb": 129024, "speculation": "off"}
+    ],
+    "speculation": {
+      "default": "dspark",
+      "options": ["dspark", "off"],
+      "draft_depth_default": 5,
+      "draft_depth_min": 1,
+      "draft_depth_max": 5,
+      "p_min_default": 0.65,
+      "p_min_presets": [0.5, 0.65, 0.8]
+    }
+  }
+}

@@ -24,6 +24,7 @@ test('resolves context-owned ubatch policies', () => {
   assert.equal(resolveProfileConfiguration(profile('hy3-iq2m'), {context: 49152}).ubatch, 512);
   assert.equal(resolveProfileConfiguration(profile('laguna-s21-q4km-dflash'), {context: 32768}).ubatch, 2048);
   assert.equal(resolveProfileConfiguration(profile('minimax-m27-iq4xs'), {context: 196608}).ubatch, 2048);
+  assert.equal(resolveProfileConfiguration(profile('dsv4-0731-dspark'), {context: 65536}).ubatch, 512);
 });
 
 test('keeps every configured context selectable and warns instead of blocking untested tiers', () => {
@@ -59,6 +60,18 @@ test('keeps every configured context selectable and warns instead of blocking un
   assert.equal(laguna256k.startable, true);
   assert.equal(laguna256k.ubatch, 2048);
   assert.equal(laguna256k.runtimeLabel, 'verified');
+  const dsv40731TargetOnly = resolveProfileConfiguration(profile('dsv4-0731-dspark'), {context: 16384});
+  assert.equal(dsv40731TargetOnly.speculation, 'off');
+  assert.equal(dsv40731TargetOnly.runtimeLabel, 'verified');
+  const dsv40731LongTargetOnly = resolveProfileConfiguration(profile('dsv4-0731-dspark'), {context: 262144});
+  assert.equal(dsv40731LongTargetOnly.speculation, 'off');
+  assert.equal(dsv40731LongTargetOnly.runtimeLabel, 'verified');
+  const dsv40731Extended = resolveProfileConfiguration(profile('dsv4-0731-dspark'), {context: 524288});
+  assert.equal(dsv40731Extended.runtimeLabel, 'custom');
+  const inkling32k = resolveProfileConfiguration(profile('inkling-small-iq3xxs'), {context: 32768});
+  assert.equal(inkling32k.startable, true);
+  assert.equal(inkling32k.runtimeLabel, 'custom');
+  assert.match(inkling32k.warnings.join('\n'), /has not been qualified.*Launch is allowed/);
 });
 
 test('classifies allowlisted expert deltas as custom', () => {

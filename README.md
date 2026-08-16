@@ -44,16 +44,16 @@ And the results we did not win: stock is 6% faster on Tess-4 prefill, 4% faster 
 
 ## Models stock llama.cpp cannot run
 
-Two of the six shipped profiles do not load in official stock llama.cpp at all — the architecture support lives in the Tess Server engine:
+In the six-profile 0.1.3 comparison set, two models did not load in official stock llama.cpp at all — the architecture support lives in the Tess Server engine:
 
 - **Laguna S.2 (118B-A8B)** with its DFlash speculative drafter. The July 21 benchmark of the initial publisher artifact measured **67.58 tok/s versus 13.45 — 5.03x** against a reference build patched only for model support at the same 24K-token depth. The refreshed publisher GGUF profiled in Tess Server 0.1.1 has passed runtime qualification but is not represented by that historical throughput result.
 - **Tencent Hy3 (298.8B)**, a 192-expert mixture-of-experts model served whole on a single 128 GiB Mac.
 
-Depth is the other frontier. MiniMax-M2.7 serves its **full 196,608-token trained context** on one M4 Max, DeepSeek-V4-Flash and Laguna S.2 are profile-qualified to 256K, and Tess-4 is qualified through a 512K YaRN target-only tier.
+Depth is the other frontier. MiniMax-M2.7 serves its **full 196,608-token trained context** on one M4 Max, the original DeepSeek-V4-Flash profile and Laguna S.2 are profile-qualified to 256K, and Tess-4 is qualified through a 512K YaRN target-only tier.
 
 ## Lossless speculative decoding, packaged
 
-Four of the six profiles ship with managed speculative decoding — DFlash for Laguna, DSpark for DeepSeek-V4-Flash, and multi-token-prediction for Tess-4 and Hy3 — pre-tuned, verified, and on by default where it wins. This is the difference between reading your model's output and waiting for it.
+Six of the ten profiles ship with managed speculative decoding — DFlash for Laguna and Muse Glimmer, DSpark for both exact DeepSeek-V4-Flash artifact generations, and multi-token-prediction for Tess-4 and Hy3 — pre-tuned, verified, and on by default where it wins. This is the difference between reading your model's output and waiting for it.
 
 Speed never trades away correctness: **every accepted draft token is still verified by the target model.** Where speculation does not help, the profile simply does not use it.
 
@@ -74,14 +74,18 @@ Profile support is exact-file specific. Other primary GGUF files are shown as **
 
 ## Supported profiles
 
-The current release includes six profiles:
+The 0.1.4 release includes ten profiles. New exact-file profiles cover Qwen3.5-122B-A10B, Inkling-Small, Muse Glimmer 30B, and the archived DeepSeek-V4-Flash-0731 artifact set. Their verified defaults stop at the recorded qualification depths; larger configured contexts remain selectable with an explicit untested warning.
 
 | Model | Quantization | GGUF size | Memory class | Default context | Available context choices |
 |---|---|---:|---:|---:|---|
 | **Laguna S.2** | Q4_K_M + BF16 DFlash | 63.6 GiB + 2.1 GiB draft | 128 GiB | 16K | 8K, 16K, 32K, 64K, 128K, 256K |
 | **Tess-4-35B-A3B** (Qwen3.6-35B-A3B base) | Tess Q8/Q4 build | 35.2 GiB | 64 GiB | 128K | 32K, 64K, 128K, 256K, 512K; untested 1M |
+| **Qwen3.5-122B-A10B** | Q4_K_M | 71.3 GiB | 128 GiB | 16K | 8K, 16K; untested 32K, 64K, 128K, and 256K |
+| **Inkling-Small** | UD-IQ3_XXS | 91.2 GiB | 128 GiB | 16K | 8K, 16K; untested 32K through 1M |
+| **Muse Glimmer 30B** | K-Quant 17GB + DFlash | 15.6 GiB + 1.5 GiB draft | 64 GiB | 16K | 8K, 16K; untested 32K, 64K, and 128K |
 | **NVIDIA Nemotron-3-Super-120B-A12B** | UD-Q4_K_M | 76.9 GiB | 128 GiB | 32K | 32K, 64K, 128K, 256K; experimental 512K and 1M |
-| **DeepSeek-V4-Flash** | UD-IQ3_XXS | 95.9 GiB | 128 GiB | 32K | 4K, 8K, 16K, 32K, 64K, 128K, 256K; untested 512K and 1M |
+| **DeepSeek-V4-Flash** | UD-IQ3_XXS + DSpark | 95.9 GiB + 10.5 GiB draft | 128 GiB | 32K | 4K, 8K, 16K, 32K, 64K, 128K, 256K; untested 512K and 1M |
+| **DeepSeek-V4-Flash-0731** | UD-IQ3_XXS + DSpark | 95.9 GiB + 10.5 GiB draft | 128 GiB | 8K | 4K, 8K with DSpark; target-only 16K, 32K, 64K, 128K, 256K; untested 512K and 1M |
 | **MiniMax-M2.7** | UD-IQ4_XS | 101 GiB | 128 GiB | 70K | 32K, 64K, 70K, 96K, 128K, 160K, 192K |
 | **Tencent Hy3** | IQ2_M | 93.1 GiB | 128 GiB | 32K | 8K, 16K, 32K, 48K; experimental 64K |
 

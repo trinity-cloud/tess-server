@@ -1,0 +1,80 @@
+{
+  "profile_id": "inkling-small-iq3xxs",
+  "schema_version": 2,
+  "engine": {
+    "min_version": "0.1.4",
+    "max_version": null
+  },
+  "model": {
+    "name": "Inkling-Small",
+    "architecture": "inkling",
+    "quant_label": "UD-IQ3_XXS",
+    "total_params": "276B",
+    "active_params": "12B"
+  },
+  "shards": [
+    {
+      "name": "Inkling-Small-UD-IQ3_XXS-00001-of-00003.gguf",
+      "bytes": 12986592,
+      "sha256": "6d0408e50ab6b8f7c9a67e957fbb97ba345bc13105e2c06019f8c51f394dc182"
+    },
+    {
+      "name": "Inkling-Small-UD-IQ3_XXS-00002-of-00003.gguf",
+      "bytes": 49408950848,
+      "sha256": "3715be57b491c9877fdba8e07ce6df8065abd3d6463e3f7320a00567a17aa9de"
+    },
+    {
+      "name": "Inkling-Small-UD-IQ3_XXS-00003-of-00003.gguf",
+      "bytes": 48508980416,
+      "sha256": "a5f3df9d7a817940dd29e0c522556455d438a232fb91770570a1a367dedf658c"
+    }
+  ],
+  "draft": null,
+  "context": {
+    "trained": 1048576,
+    "engine_allocatable": 1048576,
+    "validated": 16384,
+    "qualified": 16384,
+    "validated_prompt": 16384,
+    "validated_generation": 256,
+    "default": 16384
+  },
+  "runtime": {
+    "batch": 2048,
+    "ubatch": 2048,
+    "kv_type": "f16",
+    "slots": 1,
+    "flash_attention": true,
+    "jinja": true,
+    "env": {
+      "LLAMA_INKLING_SCONV_FUSED": 1
+    }
+  },
+  "speculation": null,
+  "memory": {
+    "ram_class_gib": 128,
+    "requires_wired_limit_mb": 129024,
+    "wired_limit_note": "The qualified profile was exercised with iogpu.wired_limit_mb=129024. Set it manually once per boot before launch; Tess Server never requests root or changes the limit."
+  },
+  "evidence": [
+    "inkling-depth-aba-20260731-192028",
+    "inkling-shortconv-identity-20260731-213111"
+  ],
+  "limitations": [
+    "Qualified through a 16,384-token prompt plus 256 generated tokens on the 128 GiB release host; larger contexts are selectable but untested.",
+    "The verified GGUF profile is text-only; native image and audio inputs have not been qualified in Tess Server.",
+    "The profile requires the packaged Metal Flash Attention and short-convolution execution policy."
+  ],
+  "expert": {
+    "context_presets": [
+      {"tokens": 8192, "label": "8K", "group": "Native", "ubatch": 2048, "requires_wired_limit_mb": 129024},
+      {"tokens": 16384, "label": "16K", "group": "Native", "recommended": true, "ubatch": 2048, "requires_wired_limit_mb": 129024},
+      {"tokens": 32768, "label": "32K", "group": "Native", "availability": "qualification-pending", "unavailable_reason": "32K has not been qualified", "ubatch": 2048, "requires_wired_limit_mb": 129024},
+      {"tokens": 65536, "label": "64K", "group": "Native", "availability": "qualification-pending", "unavailable_reason": "64K has not been qualified", "ubatch": 2048, "requires_wired_limit_mb": 129024},
+      {"tokens": 131072, "label": "128K", "group": "Native", "availability": "qualification-pending", "unavailable_reason": "128K has not been qualified", "ubatch": 2048, "requires_wired_limit_mb": 129024},
+      {"tokens": 262144, "label": "256K", "group": "Native", "availability": "qualification-pending", "unavailable_reason": "256K has not been qualified", "ubatch": 2048, "requires_wired_limit_mb": 129024},
+      {"tokens": 524288, "label": "512K", "group": "Native", "experimental": true, "availability": "qualification-pending", "unavailable_reason": "512K has not been qualified", "ubatch": 2048, "requires_wired_limit_mb": 129024},
+      {"tokens": 1048576, "label": "1M", "group": "Native", "experimental": true, "availability": "qualification-pending", "unavailable_reason": "1M has not been qualified", "ubatch": 2048, "requires_wired_limit_mb": 129024}
+    ]
+  }
+}

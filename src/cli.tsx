@@ -29,7 +29,7 @@ Usage:
 
 Options:
   --model-root PATH   Add a folder to recursive model discovery (repeatable)
-  --draft PATH        Separate draft model required by DSpark profiles
+  --draft PATH        Separate draft model required by a verified profile
   --context TOKENS    Override the profile context (runtime becomes custom if different)
   --speculation MODE  DeepSeek profile mode: dspark or off
   --draft-depth N     DeepSeek DSpark draft depth (1–5)

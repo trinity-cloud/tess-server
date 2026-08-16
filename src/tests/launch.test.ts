@@ -37,6 +37,24 @@ test('passes an exact companion to profiled DFlash launchers', () => {
   assert.deepEqual(verifySpec('/payload', laguna).args, ['/payload/scripts/verify-profile.sh', 'laguna-s21-q4km-dflash', laguna.modelPath, laguna.draftPath]);
 });
 
+test('maps every 0.1.4 profile to its packaged launcher', () => {
+  assert.equal(serveSpec('/payload', {...candidate, profile: {...profile, profile_id: 'qwen35-122b-a10b-q4km'} as ProfileDescriptor}).args[0], '/payload/scripts/serve/serve-qwen35-122b.sh');
+  assert.equal(serveSpec('/payload', {...candidate, profile: {...profile, profile_id: 'inkling-small-iq3xxs'} as ProfileDescriptor}).args[0], '/payload/scripts/serve/serve-inkling.sh');
+  assert.equal(serveSpec('/payload', {...candidate, profile: {...profile, profile_id: 'dsv4-0731-dspark'} as ProfileDescriptor}).args[0], '/payload/scripts/serve/serve-dsv4-0731.sh');
+
+  const muse: ModelCandidate = {
+    kind: 'profiled',
+    profile: {...profile, profile_id: 'muse-glimmer-30b-kquant-dflash'} as ProfileDescriptor,
+    modelPath: '/models/muse.gguf',
+    draftPath: '/models/dflash.gguf',
+    complete: true,
+    issues: [],
+  };
+  const spec = serveSpec('/payload', muse);
+  assert.equal(spec.args[0], '/payload/scripts/serve/serve-muse.sh');
+  assert.equal(spec.env.DRAFT_MODEL, muse.draftPath);
+});
+
 test('builds a configurable generic GGUF launcher with detected companions', () => {
   const genericProfile = {
     ...profile,

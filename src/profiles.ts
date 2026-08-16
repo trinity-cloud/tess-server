@@ -4,10 +4,14 @@ import type {ProfileDescriptor} from './types.js';
 
 const launcherByProfile: Readonly<Record<string, string>> = Object.freeze({
   'dsv4-dspark': 'serve-dsv4.sh',
+  'dsv4-0731-dspark': 'serve-dsv4-0731.sh',
   'hy3-iq2m': 'serve-hy3.sh',
+  'inkling-small-iq3xxs': 'serve-inkling.sh',
   'laguna-s21-q4km-dflash': 'serve-laguna.sh',
   'minimax-m27-iq4xs': 'serve-minimax.sh',
+  'muse-glimmer-30b-kquant-dflash': 'serve-muse.sh',
   'nemotron3-super-q4km': 'serve-nemotron3.sh',
+  'qwen35-122b-a10b-q4km': 'serve-qwen35-122b.sh',
   'qwen36-a3b-q8-q4mtp': 'serve-qwen36.sh',
 });
 
