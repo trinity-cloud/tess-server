@@ -22,7 +22,7 @@ if [ "$DRAFT" = 1 ]; then DSPARK=${DSPARK:?path to dspark-draft-0731.gguf}; else
 tess_profile_begin dsv4-0731-dspark
 tess_require_single_slot "$NP"
 if [ "$CTX" -gt 262144 ]; then tess_mark_custom QUALIFICATION pending qualified; fi
-if [ "$CTX" -ge 16384 ] && [ "$DRAFT" = 1 ]; then tess_mark_custom DSPARK_IDENTITY accepted-unverified verified; fi
+if [ "$CTX" -ge 16384 ] && [ "$DRAFT" = 1 ]; then tess_mark_custom DSPARK_IDENTITY accepted-unverified qualified; fi
 tess_mark_custom DRAFT "$DRAFT" 1
 tess_mark_custom DMAX "$DMAX" 5
 tess_mark_custom PMIN "$PMIN" 0.65
