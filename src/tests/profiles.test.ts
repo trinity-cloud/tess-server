@@ -22,7 +22,7 @@ test('loads all ten source profiles with launcher mappings', async () => {
   for (const profile of profiles) {
     assert.match(launcherForProfile(profile.profile_id), /^serve-.+\.sh$/);
     assert.equal(profile.schema_version, 2);
-    assert.equal(profile.engine.min_version, '0.1.4');
+    assert.equal(profile.engine.min_version, '0.1.5');
     assert.ok(profile.expert.context_presets.some(preset => preset.tokens === profile.context.default));
   }
   const laguna = profiles.find(profile => profile.profile_id === 'laguna-s21-q4km-dflash');
@@ -67,6 +67,8 @@ test('loads all ten source profiles with launcher mappings', async () => {
   assert.equal(dsv40731?.draft?.[0]?.name, 'dspark-draft-0731.gguf');
   assert.equal(dsv40731?.context.default, 8192);
   assert.equal(dsv40731?.context.qualified, 262144);
-  assert.equal(dsv40731?.expert.context_presets.find(preset => preset.tokens === 16384)?.speculation, 'off');
+  assert.equal(dsv40731?.expert.speculation?.default, 'dspark');
+  assert.equal(dsv40731?.expert.speculation?.options.includes('off'), true);
+  assert.equal(dsv40731?.expert.context_presets.find(preset => preset.tokens === 16384)?.speculation_qualification, 'accepted-unverified');
   assert.equal(dsv40731?.expert.context_presets.find(preset => preset.tokens === 262144)?.availability, undefined);
 });

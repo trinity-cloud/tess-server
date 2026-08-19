@@ -2,7 +2,7 @@
   "profile_id": "dsv4-dspark",
   "schema_version": 2,
   "engine": {
-    "min_version": "0.1.4",
+    "min_version": "0.1.5",
     "max_version": null
   },
   "model": {
@@ -75,7 +75,7 @@
     "long-context-qualification-2026-07"
   ],
   "limitations": [
-    "512K and 1M target-only contexts are selectable but untested; they carry no compatibility, memory, correctness, quality, or performance claim.",
+    "512K and 1M contexts are selectable with DSpark on by default but remain untested; they carry no compatibility, memory, correctness, quality, or performance claim.",
     "Contexts above 32,768 use managed ubatch 512; manual ubatch overrides are rejected."
   ],
   "expert": {
@@ -87,8 +87,8 @@
       {"tokens": 65536, "label": "64K", "group": "Native", "ubatch": 512, "requires_wired_limit_mb": 129024},
       {"tokens": 131072, "label": "128K", "group": "Native", "ubatch": 512, "requires_wired_limit_mb": 129024},
       {"tokens": 262144, "label": "256K", "group": "Native", "ubatch": 512, "requires_wired_limit_mb": 129024},
-      {"tokens": 524288, "label": "512K", "group": "Extended", "experimental": true, "availability": "qualification-pending", "unavailable_reason": "512K target-only has not been tested", "ubatch": 512, "requires_wired_limit_mb": 129024, "speculation": "off"},
-      {"tokens": 1048576, "label": "1M", "group": "Extended", "experimental": true, "availability": "qualification-pending", "unavailable_reason": "1M target-only has not been tested", "ubatch": 512, "requires_wired_limit_mb": 129024, "speculation": "off"}
+      {"tokens": 524288, "label": "512K", "group": "Extended", "experimental": true, "availability": "qualification-pending", "unavailable_reason": "512K with DSpark has not been tested", "ubatch": 512, "requires_wired_limit_mb": 129024},
+      {"tokens": 1048576, "label": "1M", "group": "Extended", "experimental": true, "availability": "qualification-pending", "unavailable_reason": "1M with DSpark has not been tested", "ubatch": 512, "requires_wired_limit_mb": 129024}
     ],
     "speculation": {
       "default": "dspark",

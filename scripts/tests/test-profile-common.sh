@@ -5,12 +5,14 @@ REPO=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 TEST_ROOT=$(mktemp -d /tmp/tess-profile-test.XXXXXX)
 trap 'rm -rf "$TEST_ROOT"' EXIT
 
-mkdir -p "$TEST_ROOT/bin" "$TEST_ROOT/profiles" "$TEST_ROOT/models" "$TEST_ROOT/cache" "$TEST_ROOT/share/tess-server"
+mkdir -p "$TEST_ROOT/bin/upstream" "$TEST_ROOT/profiles" "$TEST_ROOT/models" "$TEST_ROOT/cache" "$TEST_ROOT/share/tess-server"
 printf 'sample\n' > "$TEST_ROOT/models/sample.gguf"
 printf 'metallib fixture\n' > "$TEST_ROOT/bin/default.metallib"
 SAMPLE_BYTES=$(stat -f %z "$TEST_ROOT/models/sample.gguf")
 SAMPLE_SHA=$(shasum -a 256 "$TEST_ROOT/models/sample.gguf" | awk '{print $1}')
 METALLIB_SHA=$(shasum -a 256 "$TEST_ROOT/bin/default.metallib" | awk '{print $1}')
+printf 'upstream metallib fixture\n' > "$TEST_ROOT/bin/upstream/default.metallib"
+UPSTREAM_METALLIB_SHA=$(shasum -a 256 "$TEST_ROOT/bin/upstream/default.metallib" | awk '{print $1}')
 
 cat > "$TEST_ROOT/bin/tess-server" <<MOCK
 #!/bin/bash
@@ -23,6 +25,13 @@ MOCK
 chmod 755 "$TEST_ROOT/bin/tess-server"
 SERVER_SHA=$(shasum -a 256 "$TEST_ROOT/bin/tess-server" | awk '{print $1}')
 
+cat > "$TEST_ROOT/bin/upstream/tess-server" <<'MOCK'
+#!/bin/bash
+exit 2
+MOCK
+chmod 755 "$TEST_ROOT/bin/upstream/tess-server"
+UPSTREAM_SERVER_SHA=$(shasum -a 256 "$TEST_ROOT/bin/upstream/tess-server" | awk '{print $1}')
+
 cat > "$TEST_ROOT/share/tess-server/manifest.json" <<JSON
 {
   "product": "tess-server",
@@ -31,9 +40,19 @@ cat > "$TEST_ROOT/share/tess-server/manifest.json" <<JSON
   "engine_commit": "fixture123",
   "upstream_merge_base": "fixture-base",
   "distribution": "unsigned-dev",
+  "engine_variants": {
+    "primary": {"binary": "bin/tess-server", "metallib": "bin/default.metallib", "product_contract": true},
+    "upstream": {"binary": "bin/upstream/tess-server", "metallib": "bin/upstream/default.metallib", "product_contract": false}
+  },
+  "profiles": {
+    "fixture": {"engine_variant": "primary"},
+    "dsv4-dspark": {"engine_variant": "upstream"}
+  },
   "files": {
     "bin/tess-server": {"sha256": "$SERVER_SHA"},
-    "bin/default.metallib": {"sha256": "$METALLIB_SHA"}
+    "bin/default.metallib": {"sha256": "$METALLIB_SHA"},
+    "bin/upstream/tess-server": {"sha256": "$UPSTREAM_SERVER_SHA"},
+    "bin/upstream/default.metallib": {"sha256": "$UPSTREAM_METALLIB_SHA"}
   }
 }
 JSON
@@ -48,7 +67,9 @@ cat > "$TEST_ROOT/profiles/fixture.json" <<JSON
   "draft": null
 }
 JSON
-(cd "$TEST_ROOT" && shasum -a 256 bin/tess-server bin/default.metallib profiles/fixture.json share/tess-server/manifest.json > SHA256SUMS)
+cp "$TEST_ROOT/profiles/fixture.json" "$TEST_ROOT/profiles/dsv4-dspark.json"
+/usr/bin/sed -i '' 's/"profile_id": "fixture"/"profile_id": "dsv4-dspark"/' "$TEST_ROOT/profiles/dsv4-dspark.json"
+(cd "$TEST_ROOT" && shasum -a 256 bin/tess-server bin/default.metallib bin/upstream/tess-server bin/upstream/default.metallib profiles/fixture.json profiles/dsv4-dspark.json share/tess-server/manifest.json > SHA256SUMS)
 
 TESS_SERVER="$TEST_ROOT/bin/tess-server"
 TESS_PACKAGE_ROOT="$TEST_ROOT"
@@ -57,6 +78,13 @@ TESS_HASH_CACHE_DIR="$TEST_ROOT/cache"
 TESS_RUNTIME_LINK_DIR="$TEST_ROOT/runtime"
 . "$REPO/scripts/profile-common.sh"
 
+tess_profile_begin fixture
+[ "$TESS_ENGINE_VARIANT" = primary ]
+unset TESS_SERVER
+tess_profile_begin dsv4-dspark
+[ "$TESS_ENGINE_VARIANT" = upstream ]
+[ "$TESS_SERVER" = "$TEST_ROOT/bin/upstream/tess-server" ]
+unset TESS_SERVER
 tess_profile_begin fixture
 (cp "$TEST_ROOT/bin/default.metallib" "$TEST_ROOT/bin/default.metallib.original"
 printf 'tamper\n' >> "$TEST_ROOT/bin/default.metallib"

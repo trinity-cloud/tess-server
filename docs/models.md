@@ -15,13 +15,13 @@ Model weights are not included and Tess Server does not download them. You are r
 | **Muse Glimmer 30B** | K-Quant 17GB + DFlash | 15.6 GiB + 1.5 GiB draft | 64 GiB | 16K | 8K, 16K; untested 32K, 64K, and 128K |
 | **NVIDIA Nemotron-3-Super-120B-A12B** | UD-Q4_K_M | 76.9 GiB | 128 GiB | 32K | 32K, 64K, 128K, 256K; experimental 512K and 1M |
 | **DeepSeek-V4-Flash** | UD-IQ3_XXS + DSpark | 95.9 GiB + 10.5 GiB draft | 128 GiB | 32K | 4K, 8K, 16K, 32K, 64K, 128K, 256K; untested 512K and 1M |
-| **DeepSeek-V4-Flash-0731** | UD-IQ3_XXS + DSpark | 95.9 GiB + 10.5 GiB draft | 128 GiB | 8K | 4K, 8K with DSpark; target-only 16K, 32K, 64K, 128K, 256K; untested 512K and 1M |
+| **DeepSeek-V4-Flash-0731** | UD-IQ3_XXS + DSpark | 95.9 GiB + 10.5 GiB draft | 128 GiB | 8K | 4K-256K with DSpark by default; untested 512K and 1M; DSpark can be disabled |
 | **MiniMax-M2.7** | UD-IQ4_XS | 101 GiB | 128 GiB | 70K | 32K, 64K, 70K, 96K, 128K, 160K, 192K |
 | **Tencent Hy3** | IQ2_M | 93.1 GiB | 128 GiB | 32K | 8K, 16K, 32K, 48K; experimental 64K |
 
 Memory class describes the qualified hardware tier, not a promise that the model consumes the full amount at every context.
 
-The four 0.1.4 additions use intentionally narrow verified defaults. Qwen3.5-122B-A10B and Inkling-Small are qualified through 16K target-only serving. Muse Glimmer is qualified through 16K with its exact DFlash companion at the packaged short-round setting. DeepSeek-V4-Flash-0731 inherits the architecture-identical Preview release's verified 4K-256K context matrix: DSpark is packaged at 4K/8K and 16K-256K are target-only. Every larger configured tier is labeled custom and warns that compatibility, memory, correctness, quality, and performance are unclaimed.
+The four 0.1.4 additions use intentionally narrow verified defaults. Qwen3.5-122B-A10B and Inkling-Small are qualified through 16K target-only serving. Muse Glimmer is qualified through 16K with its exact DFlash companion at the packaged short-round setting. DeepSeek-V4-Flash-0731 defaults to DSpark at every context and exposes a target-only opt-out. Its 4K/8K identity evidence remains the narrow verified DSpark claim; one 16K deterministic canary diverged from target-only output while retaining high acceptance and approximately 20% higher decode throughput. Every larger untested tier is labeled custom and warns that compatibility, memory, correctness, quality, and performance are unclaimed.
 
 Qwen3.5-122B-A10B, Inkling-Small, and Muse Glimmer have multimodal model families, but their 0.1.4 verified profiles are text-only. Tess Server does not attach or claim a projector for these profiles until image and audio behavior passes separate qualification.
 

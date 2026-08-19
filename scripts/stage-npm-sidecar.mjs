@@ -72,7 +72,10 @@ try {
   createdDestination = true;
   await cp(payload, destination, {recursive: true, preserveTimestamps: true, errorOnExist: true, force: false});
   await writeFile(join(destination, 'npm-sidecar.json'), `${JSON.stringify({schema_version: 1, platform: 'darwin-arm64', source_archive: archiveName, source_archive_sha256: archiveSha, release_build_id: manifest.build_id, engine_commit: manifest.engine_commit}, null, 2)}\n`, {mode: 0o644});
-  await chmod(join(destination, 'bin', 'tess-server'), 0o755);
+  for (const variant of Object.values(manifest.engine_variants ?? {})) {
+    if (!variant || typeof variant !== 'object' || typeof variant.binary !== 'string') throw new Error('release manifest contains an invalid engine variant');
+    await chmod(join(destination, variant.binary), 0o755);
+  }
   const report = await verifySidecar(destination);
   console.log(`npm sidecar staged: ${report.root}`);
   console.log(`source archive sha256: ${report.sourceArchiveSha256}`);

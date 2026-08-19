@@ -4,6 +4,7 @@ Tess Server provides a guided terminal interface and a local OpenAI-compatible i
 
 - [Supported models](models.md) — profiles, memory classes, context choices, and model-file expectations.
 - [Tess Server 0.1.4](release-0.1.4.md) — added profiles and qualification boundaries.
+- [Tess Server 0.1.5](release-0.1.5.md) — current-upstream DeepSeek serving and user-controllable DSpark at every context.
 - [Running Tess Server](running.md) — installation, model discovery, server configuration, command-line operation, API access, and client context guidance.
 - [Tess-4 context qualification](tess-4-context-qualification.md) — native 256K and YaRN 512K operational anchors.
 - [Laguna context qualification](laguna-context-qualification.md) — full native 8K–256K qualification matrix.

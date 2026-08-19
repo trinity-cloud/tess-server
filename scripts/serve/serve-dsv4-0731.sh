@@ -6,14 +6,13 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 tess_reject_unmodeled_tuning_env
 tess_validate_server_settings
 MODEL=${MODEL:?path to DeepSeek-V4-Flash-0731 UD-IQ3_XXS shard 00001}
-DRAFT=${DRAFT:-1}; PROFILE_DRAFT=1; NP=${NP:-1}; CTX=${CTX:-8192}; DMAX=${DMAX:-5}; PMIN=${PMIN:-0.65}
+DRAFT=${DRAFT:-1}; NP=${NP:-1}; CTX=${CTX:-8192}; DMAX=${DMAX:-5}; PMIN=${PMIN:-0.65}
 [ -z "${UB+x}" ] || tess_die "UB is managed automatically for DeepSeek 0731; remove the manual override"
 [ -z "${BATCH+x}" ] || tess_die "BATCH is locked by the DeepSeek 0731 profile"
 tess_require_uint CTX "$CTX"; tess_require_uint DMAX "$DMAX"
 case "$CTX" in
-  4096|8192) UB=2048 ;;
-  16384|32768) UB=2048; DRAFT=0; PROFILE_DRAFT=0 ;;
-  65536|131072|262144|524288|1048576) UB=512; DRAFT=0; PROFILE_DRAFT=0 ;;
+  4096|8192|16384|32768) UB=2048 ;;
+  65536|131072|262144|524288|1048576) UB=512 ;;
   *) tess_die "unsupported DeepSeek 0731 context; choose 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, or 1048576" ;;
 esac
 [ "$DRAFT" = 0 ] || [ "$DRAFT" = 1 ] || tess_die "DRAFT must be 0 or 1"
@@ -23,7 +22,8 @@ if [ "$DRAFT" = 1 ]; then DSPARK=${DSPARK:?path to dspark-draft-0731.gguf}; else
 tess_profile_begin dsv4-0731-dspark
 tess_require_single_slot "$NP"
 if [ "$CTX" -gt 262144 ]; then tess_mark_custom QUALIFICATION pending qualified; fi
-tess_mark_custom DRAFT "$DRAFT" "$PROFILE_DRAFT"
+if [ "$CTX" -ge 16384 ] && [ "$DRAFT" = 1 ]; then tess_mark_custom DSPARK_IDENTITY accepted-unverified verified; fi
+tess_mark_custom DRAFT "$DRAFT" 1
 tess_mark_custom DMAX "$DMAX" 5
 tess_mark_custom PMIN "$PMIN" 0.65
 

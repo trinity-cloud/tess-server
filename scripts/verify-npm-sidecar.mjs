@@ -36,7 +36,7 @@ async function listFiles(root) {
 
 export async function verifySidecar(root = process.env.TESS_NPM_SIDECAR_ROOT || join(repoRoot, 'sidecar', 'darwin-arm64')) {
   const payloadFiles = await listFiles(root);
-  const required = ['bin/tess-server', 'bin/default.metallib', 'profiles', 'scripts/verify-profile.sh', 'share/tess-server/manifest.json', 'SHA256SUMS', 'npm-sidecar.json'];
+  const required = ['bin/tess-server', 'bin/default.metallib', 'bin/upstream/tess-server', 'bin/upstream/default.metallib', 'profiles', 'scripts/verify-profile.sh', 'share/tess-server/manifest.json', 'SHA256SUMS', 'npm-sidecar.json'];
   for (const item of required) {
     await access(join(root, item), constants.R_OK);
   }
@@ -53,6 +53,10 @@ export async function verifySidecar(root = process.env.TESS_NPM_SIDECAR_ROOT || 
   }
   if (manifest.license_status !== 'owner-approved') {
     throw new Error(`sidecar license is not owner-approved: ${manifest.license_status ?? 'missing status'}`);
+  }
+  const engineVariants = manifest.engine_variants;
+  if (!engineVariants || typeof engineVariants !== 'object' || !engineVariants.primary || !engineVariants.upstream) {
+    throw new Error('sidecar manifest does not declare the primary and upstream engine variants');
   }
   if (metadata.schema_version !== 1 || metadata.source_archive_sha256?.length !== 64 || metadata.platform !== 'darwin-arm64') {
     throw new Error('npm-sidecar.json is invalid');
@@ -85,6 +89,22 @@ export async function verifySidecar(root = process.env.TESS_NPM_SIDECAR_ROOT || 
   const fileResult = spawnSync('/usr/bin/file', [binary], {encoding: 'utf8'});
   if (fileResult.status !== 0 || !fileResult.stdout.includes('Mach-O 64-bit executable arm64')) {
     throw new Error('sidecar engine is not a thin arm64 Mach-O executable');
+  }
+  for (const [variantId, variant] of Object.entries(engineVariants)) {
+    if (!variant || typeof variant !== 'object' || typeof variant.binary !== 'string' || typeof variant.metallib !== 'string') {
+      throw new Error(`invalid engine variant manifest entry: ${variantId}`);
+    }
+    const variantBinary = join(root, variant.binary);
+    const variantMetallib = join(root, variant.metallib);
+    await access(variantBinary, constants.X_OK);
+    await access(variantMetallib, constants.R_OK);
+    if (await sha256(variantBinary) !== variant.binary_sha256 || await sha256(variantMetallib) !== variant.metallib_sha256) {
+      throw new Error(`engine variant checksum mismatch: ${variantId}`);
+    }
+    const variantFile = spawnSync('/usr/bin/file', [variantBinary], {encoding: 'utf8'});
+    if (variantFile.status !== 0 || !variantFile.stdout.includes('Mach-O 64-bit executable arm64')) {
+      throw new Error(`engine variant is not a thin arm64 Mach-O executable: ${variantId}`);
+    }
   }
   const forbidden = payloadFiles.map(path => relative(root, path)).filter(path => /\.(gguf|safetensors|metal|dSYM)$/i.test(path));
   if (forbidden.length > 0) throw new Error(`forbidden model/source/debug material in npm sidecar: ${forbidden.join(', ')}`);

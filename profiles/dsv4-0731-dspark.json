@@ -2,7 +2,7 @@
   "profile_id": "dsv4-0731-dspark",
   "schema_version": 2,
   "engine": {
-    "min_version": "0.1.4",
+    "min_version": "0.1.5",
     "max_version": null
   },
   "model": {
@@ -78,21 +78,21 @@
     "long-context-qualification-2026-07"
   ],
   "limitations": [
-    "The verified context matrix inherits the Preview artifact's 4K-256K qualification after the 0731 release proved architecture and greedy-output equivalence; DSpark is packaged at 4K/8K and 16K-256K are target-only.",
+    "DSpark defaults on at every selectable context and can be disabled by the user. A single 16K deterministic canary differed from target-only output while retaining high acceptance and approximately 20% higher decode throughput; no general long-context identity claim is made.",
     "This profile matches the archived 0731 shard set used by the recorded campaign; later publisher refreshes have different hashes and are unprofiled.",
-    "512K and 1M target-only contexts are selectable but untested; contexts above 32,768 use managed ubatch 512 and manual ubatch overrides are rejected."
+    "512K and 1M contexts are selectable with DSpark on by default but remain untested; contexts above 32,768 use managed ubatch 512 and manual ubatch overrides are rejected."
   ],
   "expert": {
     "context_presets": [
       {"tokens": 4096, "label": "4K", "group": "Native", "ubatch": 2048, "requires_wired_limit_mb": 129024},
       {"tokens": 8192, "label": "8K", "group": "Native", "recommended": true, "ubatch": 2048, "requires_wired_limit_mb": 129024},
-      {"tokens": 16384, "label": "16K", "group": "Native", "ubatch": 2048, "requires_wired_limit_mb": 129024, "speculation": "off"},
-      {"tokens": 32768, "label": "32K", "group": "Native", "ubatch": 2048, "requires_wired_limit_mb": 129024, "speculation": "off"},
-      {"tokens": 65536, "label": "64K", "group": "Native", "ubatch": 512, "requires_wired_limit_mb": 129024, "speculation": "off"},
-      {"tokens": 131072, "label": "128K", "group": "Native", "ubatch": 512, "requires_wired_limit_mb": 129024, "speculation": "off"},
-      {"tokens": 262144, "label": "256K", "group": "Native", "ubatch": 512, "requires_wired_limit_mb": 129024, "speculation": "off"},
-      {"tokens": 524288, "label": "512K", "group": "Extended", "experimental": true, "availability": "qualification-pending", "unavailable_reason": "512K has not been qualified on the 0731 artifact set", "ubatch": 512, "requires_wired_limit_mb": 129024, "speculation": "off"},
-      {"tokens": 1048576, "label": "1M", "group": "Extended", "experimental": true, "availability": "qualification-pending", "unavailable_reason": "1M has not been qualified on the 0731 artifact set", "ubatch": 512, "requires_wired_limit_mb": 129024, "speculation": "off"}
+      {"tokens": 16384, "label": "16K", "group": "Native", "ubatch": 2048, "requires_wired_limit_mb": 129024, "speculation_qualification": "accepted-unverified"},
+      {"tokens": 32768, "label": "32K", "group": "Native", "ubatch": 2048, "requires_wired_limit_mb": 129024, "speculation_qualification": "accepted-unverified"},
+      {"tokens": 65536, "label": "64K", "group": "Native", "ubatch": 512, "requires_wired_limit_mb": 129024, "speculation_qualification": "accepted-unverified"},
+      {"tokens": 131072, "label": "128K", "group": "Native", "ubatch": 512, "requires_wired_limit_mb": 129024, "speculation_qualification": "accepted-unverified"},
+      {"tokens": 262144, "label": "256K", "group": "Native", "ubatch": 512, "requires_wired_limit_mb": 129024, "speculation_qualification": "accepted-unverified"},
+      {"tokens": 524288, "label": "512K", "group": "Extended", "experimental": true, "availability": "qualification-pending", "unavailable_reason": "512K with DSpark has not been qualified on the 0731 artifact set", "ubatch": 512, "requires_wired_limit_mb": 129024, "speculation_qualification": "accepted-unverified"},
+      {"tokens": 1048576, "label": "1M", "group": "Extended", "experimental": true, "availability": "qualification-pending", "unavailable_reason": "1M with DSpark has not been qualified on the 0731 artifact set", "ubatch": 512, "requires_wired_limit_mb": 129024, "speculation_qualification": "accepted-unverified"}
     ],
     "speculation": {
       "default": "dspark",

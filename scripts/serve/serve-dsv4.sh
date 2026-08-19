@@ -13,7 +13,7 @@ tess_require_uint CTX "$CTX"; tess_require_uint DMAX "$DMAX"
 case "$CTX" in
   4096|8192|16384|32768) UB=2048 ;;
   65536|131072|262144) UB=512 ;;
-  524288|1048576) UB=512; DRAFT=0 ;;
+  524288|1048576) UB=512 ;;
   *) tess_die "unsupported DeepSeek context; choose 4096, 8192, 16384, 32768, 65536, 131072, 262144, 524288, or 1048576" ;;
 esac
 [ "$DRAFT" = "0" ] || [ "$DRAFT" = "1" ] || tess_die "DRAFT must be 0 or 1"

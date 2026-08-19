@@ -133,6 +133,10 @@ export function resolveProfileConfiguration(profile: ProfileDescriptor, override
       throw new Error('p_min must be between 0 and 1');
     }
     if (selectedSpeculation !== speculationConfig.default) deltas.push(`speculation=${selectedSpeculation} (verified ${speculationConfig.default})`);
+    if (selectedSpeculation === 'dspark' && preset.speculation_qualification === 'accepted-unverified') {
+      deltas.push(`dspark_identity=accepted-unverified at ${preset.label}`);
+      warnings.push(`DSpark is enabled by default at ${preset.label}, but token identity is not qualified at this context. Switch speculation off for target-only decoding.`);
+    }
     if (selectedDepth !== speculationConfig.draft_depth_default) deltas.push(`draft_depth=${selectedDepth} (verified ${speculationConfig.draft_depth_default})`);
     if (selectedPMin !== speculationConfig.p_min_default) deltas.push(`p_min=${selectedPMin} (verified ${speculationConfig.p_min_default})`);
     if (selectedPMin < 0.5) warnings.push('p_min below 0.5 can underperform target-only decode on mixed traffic.');

@@ -69,13 +69,28 @@ tess_reject_unmodeled_tuning_env() {
 tess_resolve_server() {
   local candidate resolved version_json product version expected_version metallib_sha
   local manifest expected_binary_sha expected_metallib_sha actual_binary_sha manifest_binary_sha manifest_metallib_sha
+  local binary_rel metallib_rel metallib_manifest_key variant manifest_variant
   local field manifest_value binary_value
+  variant=${TESS_ENGINE_VARIANT:-primary}
+  case "$variant" in
+    primary)
+      binary_rel=bin/tess-server
+      metallib_rel=bin/default.metallib
+      metallib_manifest_key='bin/default\.metallib'
+      ;;
+    upstream)
+      binary_rel=bin/upstream/tess-server
+      metallib_rel=bin/upstream/default.metallib
+      metallib_manifest_key='bin/upstream/default\.metallib'
+      ;;
+    *) tess_die "unknown packaged engine variant: $variant" ;;
+  esac
   if [ -n "${TESS_SERVER:-}" ]; then
     candidate=$TESS_SERVER
-  elif [ -x "$TESS_PACKAGE_ROOT/bin/tess-server" ]; then
-    candidate="$TESS_PACKAGE_ROOT/bin/tess-server"
+  elif [ -x "$TESS_PACKAGE_ROOT/$binary_rel" ]; then
+    candidate="$TESS_PACKAGE_ROOT/$binary_rel"
   else
-    candidate=tess-server
+    tess_die "packaged $variant engine is missing: $binary_rel"
   fi
 
   case "$candidate" in
@@ -95,6 +110,25 @@ tess_resolve_server() {
   manifest="$TESS_PACKAGE_ROOT/share/tess-server/manifest.json"
   [ -f "$manifest" ] || tess_die "packaged release manifest is missing"
   tess_verify_payload_file share/tess-server/manifest.json
+  if [ -n "${TESS_PROFILE_ID:-}" ]; then
+    manifest_variant=$(/usr/bin/plutil -extract "profiles.$TESS_PROFILE_ID.engine_variant" raw -o - "$manifest" 2>/dev/null) || tess_die "release manifest lacks the engine route for $TESS_PROFILE_ID"
+    [ "$manifest_variant" = "$variant" ] || tess_die "runtime and release manifest disagree on the engine route for $TESS_PROFILE_ID"
+  fi
+  expected_binary_sha=$(tess_payload_checksum "$binary_rel")
+  expected_metallib_sha=$(tess_payload_checksum "$metallib_rel")
+  tess_verify_payload_file "$metallib_rel"
+  actual_binary_sha=$(/usr/bin/shasum -a 256 "$TESS_SERVER" | /usr/bin/awk '{print $1}') || tess_die "cannot hash selected tess-server binary"
+  [ "$actual_binary_sha" = "$expected_binary_sha" ] || tess_die "selected tess-server does not match the packaged $variant engine checksum"
+  manifest_binary_sha=$(/usr/bin/plutil -extract "files.$binary_rel.sha256" raw -o - "$manifest" 2>/dev/null) || tess_die "release manifest lacks the $variant binary checksum"
+  [ "$manifest_binary_sha" = "$expected_binary_sha" ] || tess_die "release manifest and payload checksum disagree for the $variant engine"
+  manifest_metallib_sha=$(/usr/bin/plutil -extract "files.$metallib_manifest_key.sha256" raw -o - "$manifest" 2>/dev/null) || tess_die "release manifest lacks the $variant metallib checksum"
+  [ "$manifest_metallib_sha" = "$expected_metallib_sha" ] || tess_die "release manifest and payload checksum disagree for the $variant metallib"
+
+  if [ "$variant" = upstream ]; then
+    [ "$TESS_SERVER" = "$TESS_PACKAGE_ROOT/$binary_rel" ] || tess_die "the upstream profile engine must run from its checksum-bound package directory"
+    return 0
+  fi
+
   version_json=$("$TESS_SERVER" --version-json 2>/dev/null) || tess_die "binary does not provide the Tess --version-json contract"
   product=$(printf '%s\n' "$version_json" | tess_json_get product) || tess_die "invalid --version-json output"
   [ "$product" = "tess-server" ] || tess_die "selected binary is not a Tess product build"
@@ -110,16 +144,14 @@ tess_resolve_server() {
     [ "$manifest_value" = "$binary_value" ] || tess_die "binary/release manifest mismatch: $field"
   done
 
-  expected_binary_sha=$(tess_payload_checksum bin/tess-server)
-  expected_metallib_sha=$(tess_payload_checksum bin/default.metallib)
-  tess_verify_payload_file bin/default.metallib
-  actual_binary_sha=$(/usr/bin/shasum -a 256 "$TESS_SERVER" | /usr/bin/awk '{print $1}') || tess_die "cannot hash selected tess-server binary"
-  [ "$actual_binary_sha" = "$expected_binary_sha" ] || tess_die "selected tess-server does not match the packaged binary checksum"
   [ "$metallib_sha" = "$expected_metallib_sha" ] || tess_die "selected default.metallib does not match the packaged metallib checksum"
-  manifest_binary_sha=$(/usr/bin/plutil -extract 'files.bin/tess-server.sha256' raw -o - "$manifest" 2>/dev/null) || tess_die "release manifest lacks the binary checksum"
-  [ "$manifest_binary_sha" = "$expected_binary_sha" ] || tess_die "release manifest and payload checksum disagree for tess-server"
-  manifest_metallib_sha=$(/usr/bin/plutil -extract 'files.bin/default\.metallib.sha256' raw -o - "$manifest" 2>/dev/null) || tess_die "release manifest lacks the metallib checksum"
-  [ "$manifest_metallib_sha" = "$expected_metallib_sha" ] || tess_die "release manifest and payload checksum disagree for default.metallib"
+}
+
+tess_profile_engine_variant() {
+  case "$1" in
+    dsv4-dspark|dsv4-0731-dspark|minimax-m27-iq4xs) printf '%s\n' upstream ;;
+    *) printf '%s\n' primary ;;
+  esac
 }
 
 tess_profile_begin() {
@@ -132,6 +164,7 @@ tess_profile_begin() {
   actual_id=$(tess_profile_get profile_id) || tess_die "profile_id missing from $expected_id.json"
   [ "$actual_id" = "$expected_id" ] || tess_die "profile ID does not match its filename"
   TESS_PROFILE_ID=$actual_id
+  TESS_ENGINE_VARIANT=$(tess_profile_engine_variant "$TESS_PROFILE_ID")
   tess_resolve_server
 }
 

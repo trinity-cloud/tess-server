@@ -2,7 +2,7 @@
   "profile_id": "muse-glimmer-30b-kquant-dflash",
   "schema_version": 2,
   "engine": {
-    "min_version": "0.1.4",
+    "min_version": "0.1.5",
     "max_version": null
   },
   "model": {

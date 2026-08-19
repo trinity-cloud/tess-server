@@ -41,6 +41,7 @@ export interface ProfileContextPreset {
   batch?: number;
   requires_wired_limit_mb?: number;
   speculation?: 'profile' | 'off';
+  speculation_qualification?: 'accepted-unverified';
   rope?: {
     type: 'yarn';
     factor: number;

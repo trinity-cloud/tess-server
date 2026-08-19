@@ -37,7 +37,7 @@ test('passes an exact companion to profiled DFlash launchers', () => {
   assert.deepEqual(verifySpec('/payload', laguna).args, ['/payload/scripts/verify-profile.sh', 'laguna-s21-q4km-dflash', laguna.modelPath, laguna.draftPath]);
 });
 
-test('maps every 0.1.4 profile to its packaged launcher', () => {
+test('maps every 0.1.5 profile to its packaged launcher', () => {
   assert.equal(serveSpec('/payload', {...candidate, profile: {...profile, profile_id: 'qwen35-122b-a10b-q4km'} as ProfileDescriptor}).args[0], '/payload/scripts/serve/serve-qwen35-122b.sh');
   assert.equal(serveSpec('/payload', {...candidate, profile: {...profile, profile_id: 'inkling-small-iq3xxs'} as ProfileDescriptor}).args[0], '/payload/scripts/serve/serve-inkling.sh');
   assert.equal(serveSpec('/payload', {...candidate, profile: {...profile, profile_id: 'dsv4-0731-dspark'} as ProfileDescriptor}).args[0], '/payload/scripts/serve/serve-dsv4-0731.sh');
@@ -53,6 +53,18 @@ test('maps every 0.1.4 profile to its packaged launcher', () => {
   const spec = serveSpec('/payload', muse);
   assert.equal(spec.args[0], '/payload/scripts/serve/serve-muse.sh');
   assert.equal(spec.env.DRAFT_MODEL, muse.draftPath);
+});
+
+test('leaves DSpark on by profile default and passes the user opt-out', () => {
+  const dsv4Profile = {...profile, profile_id: 'dsv4-0731-dspark'} as ProfileDescriptor;
+  const dsv4: ModelCandidate = {
+    kind: 'profiled', profile: dsv4Profile, modelPath: '/models/dsv4.gguf', draftPath: '/models/dspark.gguf', complete: true, issues: [],
+  };
+  const defaultSpec = serveSpec('/payload', dsv4, {context: 16384});
+  assert.equal(defaultSpec.env.DRAFT, undefined);
+  assert.equal(defaultSpec.env.DSPARK, '/models/dspark.gguf');
+  const targetOnlySpec = serveSpec('/payload', dsv4, {context: 16384, speculation: 'off'});
+  assert.equal(targetOnlySpec.env.DRAFT, '0');
 });
 
 test('builds a configurable generic GGUF launcher with detected companions', () => {

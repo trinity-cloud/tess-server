@@ -13,6 +13,13 @@ VERSION=$3
 BUILD_ID=$4
 DISTRIBUTION=${5:-unsigned-dev}
 MIN_MACOS=15.0
+PRODUCT_CONTRACT=${TESS_PRODUCT_CONTRACT:-1}
+
+case "$PRODUCT_CONTRACT" in
+  0) OUTPUT_NAME=llama-server ;;
+  1) OUTPUT_NAME=tess-server ;;
+  *) echo "TESS_PRODUCT_CONTRACT must be 0 or 1" >&2; exit 2 ;;
+esac
 
 : "${DEVELOPER_DIR:?set DEVELOPER_DIR to the exact Xcode Developer directory used for the release}"
 : "${TESS_UPSTREAM_MERGE_BASE:?set TESS_UPSTREAM_MERGE_BASE to the reviewed full upstream commit}"
@@ -42,7 +49,12 @@ fi
 # Freeze the audited vendored dependency set. Any update here stops the build
 # until THIRD_PARTY_NOTICES, shipped license texts, and the SPDX inventory have
 # been reviewed together.
-grep -Fq '#define CPPHTTPLIB_VERSION "0.49.0"' "$SOURCE/vendor/cpp-httplib/httplib.h" || { echo "FAIL: unaudited cpp-httplib version" >&2; exit 1; }
+if [ "$PRODUCT_CONTRACT" = 1 ]; then
+  CPPHTTPLIB_VERSION=0.49.0
+else
+  CPPHTTPLIB_VERSION=0.53.1
+fi
+grep -Fq "#define CPPHTTPLIB_VERSION \"$CPPHTTPLIB_VERSION\"" "$SOURCE/vendor/cpp-httplib/httplib.h" || { echo "FAIL: unaudited cpp-httplib version" >&2; exit 1; }
 grep -Fq '#define NLOHMANN_JSON_VERSION_MAJOR 3' "$SOURCE/vendor/nlohmann/json.hpp" || { echo "FAIL: unaudited nlohmann-json major version" >&2; exit 1; }
 grep -Fq '#define NLOHMANN_JSON_VERSION_MINOR 12' "$SOURCE/vendor/nlohmann/json.hpp" || { echo "FAIL: unaudited nlohmann-json minor version" >&2; exit 1; }
 grep -Fq '#define NLOHMANN_JSON_VERSION_PATCH 0' "$SOURCE/vendor/nlohmann/json.hpp" || { echo "FAIL: unaudited nlohmann-json patch version" >&2; exit 1; }
@@ -125,12 +137,12 @@ configure_build() {
 }
 
 for build in "$BUILD_A" "$BUILD_B"; do
-  configure_build "$build" OFF 1
+  configure_build "$build" OFF "$PRODUCT_CONTRACT"
   SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH "$CMAKE" --build "$build" --target llama-server ggml-metal-lib -j 12
-  dsymutil "$build/bin/tess-server" -o "$build/tess-server.dSYM"
-  strip -S -x "$build/bin/tess-server"
-  codesign --force --sign - --timestamp=none "$build/bin/tess-server"
-  codesign --verify --strict "$build/bin/tess-server"
+  dsymutil "$build/bin/$OUTPUT_NAME" -o "$build/tess-server.dSYM"
+  strip -S -x "$build/bin/$OUTPUT_NAME"
+  codesign --force --sign - --timestamp=none "$build/bin/$OUTPUT_NAME"
+  codesign --verify --strict "$build/bin/$OUTPUT_NAME"
 done
 
 configure_build "$BUILD_REFERENCE" ON 0
@@ -140,7 +152,7 @@ codesign --force --sign - --timestamp=none "$BUILD_REFERENCE/bin/llama-server"
 codesign --verify --strict "$BUILD_REFERENCE/bin/llama-server"
 
 EXE_BYTE_IDENTICAL=False
-if cmp -s "$BUILD_A/bin/tess-server" "$BUILD_B/bin/tess-server"; then
+if cmp -s "$BUILD_A/bin/$OUTPUT_NAME" "$BUILD_B/bin/$OUTPUT_NAME"; then
   EXE_BYTE_IDENTICAL=True
 else
   # ld64 assigns a fresh LC_UUID to every otherwise-identical link, and the
@@ -148,8 +160,8 @@ else
   # removing those two pieces of per-link metadata.
   NORMALIZE_DIR=$(mktemp -d /tmp/tess-macho-compare.XXXXXX)
   trap 'rm -rf "$NORMALIZE_DIR"' EXIT
-  cp "$BUILD_A/bin/tess-server" "$NORMALIZE_DIR/a"
-  cp "$BUILD_B/bin/tess-server" "$NORMALIZE_DIR/b"
+  cp "$BUILD_A/bin/$OUTPUT_NAME" "$NORMALIZE_DIR/a"
+  cp "$BUILD_B/bin/$OUTPUT_NAME" "$NORMALIZE_DIR/b"
   codesign --remove-signature "$NORMALIZE_DIR/a"
   codesign --remove-signature "$NORMALIZE_DIR/b"
   python3 - "$NORMALIZE_DIR/a" "$NORMALIZE_DIR/b" <<'PY'
@@ -174,20 +186,25 @@ PY
 fi
 cmp -s "$BUILD_A/bin/default.metallib" "$BUILD_B/bin/default.metallib" || { echo "FAIL: metallibs differ" >&2; exit 1; }
 
-VERSION_A=$($BUILD_A/bin/tess-server --version-json)
-VERSION_B=$($BUILD_B/bin/tess-server --version-json)
-[ "$VERSION_A" = "$VERSION_B" ] || { echo "FAIL: version JSON differs" >&2; exit 1; }
-VERSION_ENGINE_COMMIT=$(printf '%s\n' "$VERSION_A" | plutil -extract engine_commit raw -o - -)
-VERSION_UPSTREAM_BASE=$(printf '%s\n' "$VERSION_A" | plutil -extract upstream_merge_base raw -o - -)
-[ "$VERSION_ENGINE_COMMIT" = "$ENGINE_COMMIT" ] || { echo "FAIL: version JSON does not report the exact engine commit" >&2; exit 1; }
-[ "$VERSION_UPSTREAM_BASE" = "$UPSTREAM_MERGE_BASE" ] || { echo "FAIL: version JSON does not report the exact upstream merge base" >&2; exit 1; }
+if [ "$PRODUCT_CONTRACT" = 1 ]; then
+  VERSION_A=$($BUILD_A/bin/$OUTPUT_NAME --version-json)
+  VERSION_B=$($BUILD_B/bin/$OUTPUT_NAME --version-json)
+  [ "$VERSION_A" = "$VERSION_B" ] || { echo "FAIL: version JSON differs" >&2; exit 1; }
+  VERSION_ENGINE_COMMIT=$(printf '%s\n' "$VERSION_A" | plutil -extract engine_commit raw -o - -)
+  VERSION_UPSTREAM_BASE=$(printf '%s\n' "$VERSION_A" | plutil -extract upstream_merge_base raw -o - -)
+  [ "$VERSION_ENGINE_COMMIT" = "$ENGINE_COMMIT" ] || { echo "FAIL: version JSON does not report the exact engine commit" >&2; exit 1; }
+  [ "$VERSION_UPSTREAM_BASE" = "$UPSTREAM_MERGE_BASE" ] || { echo "FAIL: version JSON does not report the exact upstream merge base" >&2; exit 1; }
+else
+  VERSION_A=null
+  VERSION_B=null
+fi
 
-EXE_SHA=$(shasum -a 256 "$BUILD_A/bin/tess-server" | awk '{print $1}')
+EXE_SHA=$(shasum -a 256 "$BUILD_A/bin/$OUTPUT_NAME" | awk '{print $1}')
 LIB_SHA=$(shasum -a 256 "$BUILD_A/bin/default.metallib" | awk '{print $1}')
 REFERENCE_SHA=$(shasum -a 256 "$BUILD_REFERENCE/bin/llama-server" | awk '{print $1}')
-BINARY_SDK=$(vtool -show-build "$BUILD_A/bin/tess-server" | awk '$1 == "sdk" {print $2; exit}')
-BINARY_MINOS=$(vtool -show-build "$BUILD_A/bin/tess-server" | awk '$1 == "minos" {print $2; exit}')
-BINARY_UUID=$(dwarfdump --uuid "$BUILD_A/bin/tess-server" | awk '{print $2}')
+BINARY_SDK=$(vtool -show-build "$BUILD_A/bin/$OUTPUT_NAME" | awk '$1 == "sdk" {print $2; exit}')
+BINARY_MINOS=$(vtool -show-build "$BUILD_A/bin/$OUTPUT_NAME" | awk '$1 == "minos" {print $2; exit}')
+BINARY_UUID=$(dwarfdump --uuid "$BUILD_A/bin/$OUTPUT_NAME" | awk '{print $2}')
 DSYM_UUID=$(dwarfdump --uuid "$BUILD_A/tess-server.dSYM" | awk '{print $2}')
 [ "$BINARY_MINOS" = "$MIN_MACOS" ] || { echo "FAIL: binary minOS is $BINARY_MINOS" >&2; exit 1; }
 [ "$BINARY_SDK" = "$SDK_VERSION" ] || { echo "FAIL: binary SDK $BINARY_SDK != selected SDK $SDK_VERSION" >&2; exit 1; }
@@ -209,6 +226,8 @@ data = {
     "version": "$VERSION",
     "build_id": "$BUILD_ID",
     "distribution": "$DISTRIBUTION",
+    "product_contract": bool(int("$PRODUCT_CONTRACT")),
+    "binary_name": "$OUTPUT_NAME",
     "source": {
         "engine_commit": "$ENGINE_COMMIT",
         "engine_commit_short": "$ENGINE_COMMIT_SHORT",
@@ -265,9 +284,10 @@ done
 
 cmp -s "$BUILD_A/build-provenance.json" "$BUILD_B/build-provenance.json" || { echo "FAIL: provenance records differ" >&2; exit 1; }
 echo "release double-build: PASS"
+echo "product contract: $PRODUCT_CONTRACT"
 echo "build A: $BUILD_A"
 echo "build B: $BUILD_B"
-echo "tess-server sha256: $EXE_SHA"
+echo "$OUTPUT_NAME sha256: $EXE_SHA"
 echo "default.metallib sha256: $LIB_SHA"
 echo "private runtime-Metal reference sha256: $REFERENCE_SHA"
 echo "private dSYM UUID: $BINARY_UUID"

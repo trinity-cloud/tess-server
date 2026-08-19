@@ -74,7 +74,7 @@ Profile support is exact-file specific. Other primary GGUF files are shown as **
 
 ## Supported profiles
 
-The 0.1.4 release includes ten profiles. New exact-file profiles cover Qwen3.5-122B-A10B, Inkling-Small, Muse Glimmer 30B, and the archived DeepSeek-V4-Flash-0731 artifact set. Their verified defaults stop at the recorded qualification depths; larger configured contexts remain selectable with an explicit untested warning.
+The 0.1.5 release includes ten profiles. New exact-file profiles cover Qwen3.5-122B-A10B, Inkling-Small, Muse Glimmer 30B, and the archived DeepSeek-V4-Flash-0731 artifact set. Their verified defaults stop at the recorded qualification depths; larger configured contexts remain selectable with an explicit untested warning.
 
 | Model | Quantization | GGUF size | Memory class | Default context | Available context choices |
 |---|---|---:|---:|---:|---|
@@ -85,7 +85,7 @@ The 0.1.4 release includes ten profiles. New exact-file profiles cover Qwen3.5-1
 | **Muse Glimmer 30B** | K-Quant 17GB + DFlash | 15.6 GiB + 1.5 GiB draft | 64 GiB | 16K | 8K, 16K; untested 32K, 64K, and 128K |
 | **NVIDIA Nemotron-3-Super-120B-A12B** | UD-Q4_K_M | 76.9 GiB | 128 GiB | 32K | 32K, 64K, 128K, 256K; experimental 512K and 1M |
 | **DeepSeek-V4-Flash** | UD-IQ3_XXS + DSpark | 95.9 GiB + 10.5 GiB draft | 128 GiB | 32K | 4K, 8K, 16K, 32K, 64K, 128K, 256K; untested 512K and 1M |
-| **DeepSeek-V4-Flash-0731** | UD-IQ3_XXS + DSpark | 95.9 GiB + 10.5 GiB draft | 128 GiB | 8K | 4K, 8K with DSpark; target-only 16K, 32K, 64K, 128K, 256K; untested 512K and 1M |
+| **DeepSeek-V4-Flash-0731** | UD-IQ3_XXS + DSpark | 95.9 GiB + 10.5 GiB draft | 128 GiB | 8K | 4K-256K with DSpark by default; untested 512K and 1M; DSpark can be disabled |
 | **MiniMax-M2.7** | UD-IQ4_XS | 101 GiB | 128 GiB | 70K | 32K, 64K, 70K, 96K, 128K, 160K, 192K |
 | **Tencent Hy3** | IQ2_M | 93.1 GiB | 128 GiB | 32K | 8K, 16K, 32K, 48K; experimental 64K |
 
