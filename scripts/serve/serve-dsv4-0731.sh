@@ -18,7 +18,7 @@ esac
 [ "$DRAFT" = 0 ] || [ "$DRAFT" = 1 ] || tess_die "DRAFT must be 0 or 1"
 [ "$DMAX" -ge 1 ] && [ "$DMAX" -le 5 ] || tess_die "DMAX must be between 1 and 5"
 /usr/bin/awk -v value="$PMIN" 'BEGIN { exit !(value ~ /^[0-9]*\.?[0-9]+$/ && value >= 0 && value <= 1) }' || tess_die "PMIN must be between 0 and 1"
-if [ "$DRAFT" = 1 ]; then DSPARK=${DSPARK:?path to dspark-draft-0731.gguf}; else TESS_DRAFT_OPTIONAL=1; export TESS_DRAFT_OPTIONAL; fi
+if [ "$DRAFT" = 1 ]; then DSPARK=${DSPARK:?path to dspark-draft-0731-upstream.gguf}; else TESS_DRAFT_OPTIONAL=1; export TESS_DRAFT_OPTIONAL; fi
 tess_profile_begin dsv4-0731-dspark
 tess_require_single_slot "$NP"
 if [ "$CTX" -gt 262144 ]; then tess_mark_custom QUALIFICATION pending qualified; fi
@@ -50,5 +50,5 @@ fi
 tess_log_runtime_label
 cd "$TESS_RUNTIME_DIR"
 ARGS=(-m "$TESS_RUNTIME_MODEL" -c "$CTX" -ub "$UB" -np "$NP" -ngl 99 -fa on --jinja --metrics --slots --no-webui --no-ui-mcp-proxy --no-agent --alias "$ALIAS" --host 127.0.0.1 --port "$PORT")
-if [ "$DRAFT" = 1 ]; then ARGS+=(-md "$TESS_RUNTIME_DRAFT" --spec-type draft-dspark --spec-draft-n-max "$DMAX" --spec-draft-p-min "$PMIN"); fi
+if [ "$DRAFT" = 1 ]; then ARGS+=(-md "$TESS_RUNTIME_DRAFT" --spec-type draft-dspark -ngld all --spec-draft-n-max "$DMAX" --spec-draft-p-min "$PMIN"); fi
 tess_exec_server "${ARGS[@]}"

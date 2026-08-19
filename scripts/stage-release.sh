@@ -87,6 +87,8 @@ chmod 644 "$STAGE/bin/default.metallib" "$STAGE/bin/upstream/default.metallib" "
 
 # --- product/static closure ---
 file "$STAGE/bin/tess-server" | grep -q 'Mach-O 64-bit executable arm64' || { echo "FAIL: executable is not thin arm64" >&2; exit 1; }
+PRIMARY_HELP=$("$STAGE/bin/tess-server" --help 2>&1)
+case "$PRIMARY_HELP" in *--spec-dspark*) ;; *) echo "FAIL: primary executable lacks the Preview DSpark interface" >&2; exit 1 ;; esac
 BAD_DEPS=$(otool -L "$STAGE/bin/tess-server" | tail -n +2 | awk '{print $1}' | grep -Ev '^(/System/Library/|/usr/lib/)' || true)
 [ -z "$BAD_DEPS" ] || { echo "FAIL: non-system runtime dependency: $BAD_DEPS" >&2; exit 1; }
 LOAD_COMMANDS=$(otool -l "$STAGE/bin/tess-server")
@@ -178,7 +180,7 @@ provenance = json.load(open(f"{stage}/share/tess-server/build-provenance.json"))
 upstream_provenance = json.load(open(f"{stage}/share/tess-server/engines/upstream/build-provenance.json"))
 pkg_commit = subprocess.check_output(["git", "-C", repo, "rev-parse", "HEAD"], text=True).strip()
 profiles = {}
-upstream_profiles = {"dsv4-dspark", "dsv4-0731-dspark", "minimax-m27-iq4xs"}
+upstream_profiles = {"dsv4-0731-dspark", "minimax-m27-iq4xs"}
 for p in sorted(glob.glob(f"{stage}/profiles/*.json")):
     d = json.load(open(p))
     profiles[d["profile_id"]] = {"schema_version": d["schema_version"],

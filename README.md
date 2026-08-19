@@ -53,7 +53,7 @@ Depth is the other frontier. MiniMax-M2.7 serves its **full 196,608-token traine
 
 ## Lossless speculative decoding, packaged
 
-Six of the ten profiles ship with managed speculative decoding — DFlash for Laguna and Muse Glimmer, DSpark for both exact DeepSeek-V4-Flash artifact generations, and multi-token-prediction for Tess-4 and Hy3 — pre-tuned, verified, and on by default where it wins. This is the difference between reading your model's output and waiting for it.
+Six of the ten profiles ship with managed speculative decoding — DFlash for Laguna and Muse Glimmer, DSpark for both exact DeepSeek-V4-Flash artifact generations, and multi-token-prediction for Tess-4 and Hy3 — pre-tuned and on by default where specified. The interface displays the exact qualification boundary when a selectable configuration extends beyond the recorded identity evidence.
 
 Speed never trades away correctness: **every accepted draft token is still verified by the target model.** Where speculation does not help, the profile simply does not use it.
 

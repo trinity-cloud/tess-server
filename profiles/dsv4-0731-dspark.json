@@ -36,9 +36,9 @@
   ],
   "draft": [
     {
-      "name": "dspark-draft-0731.gguf",
-      "bytes": 11315885312,
-      "sha256": "46988149b9f829379a1ddcfeea64dcf0caf4691380b3b5ee7b08aceb667b6fd9"
+      "name": "dspark-draft-0731-upstream.gguf",
+      "bytes": 10896058560,
+      "sha256": "7efe9048e8256dad8c4b5017dda5bb3aab863145e6018bbca19c6dad6a443bf0"
     }
   ],
   "context": {
@@ -79,7 +79,7 @@
   ],
   "limitations": [
     "DSpark defaults on at every selectable context and can be disabled by the user. A single 16K deterministic canary differed from target-only output while retaining high acceptance and approximately 20% higher decode throughput; no general long-context identity claim is made.",
-    "This profile matches the archived 0731 shard set used by the recorded campaign; later publisher refreshes have different hashes and are unprofiled.",
+    "This profile matches the archived 0731 shard set and the upstream-compatible DSpark companion used by the recorded campaign; the fork-format dspark-draft-0731.gguf is not interchangeable.",
     "512K and 1M contexts are selectable with DSpark on by default but remain untested; contexts above 32,768 use managed ubatch 512 and manual ubatch overrides are rejected."
   ],
   "expert": {

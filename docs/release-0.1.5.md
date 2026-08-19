@@ -1,6 +1,6 @@
 # Tess Server 0.1.5
 
-Tess Server 0.1.5 refreshes the packaged inference runtime so DeepSeek-V4-Flash uses the current upstream implementation while the other verified profiles retain their qualified performance paths.
+Tess Server 0.1.5 refreshes the packaged inference runtime so DeepSeek-V4-Flash-0731 uses the current upstream implementation and its exact upstream-compatible DSpark companion. The earlier Preview artifact generation remains on its compatible optimized engine, while the other verified profiles retain their qualified performance paths.
 
 ## DeepSeek and DSpark
 

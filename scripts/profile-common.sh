@@ -149,7 +149,7 @@ tess_resolve_server() {
 
 tess_profile_engine_variant() {
   case "$1" in
-    dsv4-dspark|dsv4-0731-dspark|minimax-m27-iq4xs) printf '%s\n' upstream ;;
+    dsv4-0731-dspark|minimax-m27-iq4xs) printf '%s\n' upstream ;;
     *) printf '%s\n' primary ;;
   esac
 }

@@ -46,7 +46,8 @@ cat > "$TEST_ROOT/share/tess-server/manifest.json" <<JSON
   },
   "profiles": {
     "fixture": {"engine_variant": "primary"},
-    "dsv4-dspark": {"engine_variant": "upstream"}
+    "dsv4-dspark": {"engine_variant": "primary"},
+    "dsv4-0731-dspark": {"engine_variant": "upstream"}
   },
   "files": {
     "bin/tess-server": {"sha256": "$SERVER_SHA"},
@@ -69,7 +70,9 @@ cat > "$TEST_ROOT/profiles/fixture.json" <<JSON
 JSON
 cp "$TEST_ROOT/profiles/fixture.json" "$TEST_ROOT/profiles/dsv4-dspark.json"
 /usr/bin/sed -i '' 's/"profile_id": "fixture"/"profile_id": "dsv4-dspark"/' "$TEST_ROOT/profiles/dsv4-dspark.json"
-(cd "$TEST_ROOT" && shasum -a 256 bin/tess-server bin/default.metallib bin/upstream/tess-server bin/upstream/default.metallib profiles/fixture.json profiles/dsv4-dspark.json share/tess-server/manifest.json > SHA256SUMS)
+cp "$TEST_ROOT/profiles/fixture.json" "$TEST_ROOT/profiles/dsv4-0731-dspark.json"
+/usr/bin/sed -i '' 's/"profile_id": "fixture"/"profile_id": "dsv4-0731-dspark"/' "$TEST_ROOT/profiles/dsv4-0731-dspark.json"
+(cd "$TEST_ROOT" && shasum -a 256 bin/tess-server bin/default.metallib bin/upstream/tess-server bin/upstream/default.metallib profiles/fixture.json profiles/dsv4-dspark.json profiles/dsv4-0731-dspark.json share/tess-server/manifest.json > SHA256SUMS)
 
 TESS_SERVER="$TEST_ROOT/bin/tess-server"
 TESS_PACKAGE_ROOT="$TEST_ROOT"
@@ -82,6 +85,10 @@ tess_profile_begin fixture
 [ "$TESS_ENGINE_VARIANT" = primary ]
 unset TESS_SERVER
 tess_profile_begin dsv4-dspark
+[ "$TESS_ENGINE_VARIANT" = primary ]
+[ "$TESS_SERVER" = "$TEST_ROOT/bin/tess-server" ]
+unset TESS_SERVER
+tess_profile_begin dsv4-0731-dspark
 [ "$TESS_ENGINE_VARIANT" = upstream ]
 [ "$TESS_SERVER" = "$TEST_ROOT/bin/upstream/tess-server" ]
 unset TESS_SERVER
@@ -173,11 +180,7 @@ if grep -R 'REASONING_ARGS\[@\]' "$REPO/scripts/serve" >/dev/null; then
   echo "potentially empty reasoning-array expansion remains in a launcher" >&2
   exit 1
 fi
-if grep -R -- '--spec-dspark' "$REPO/scripts/serve" >/dev/null; then
-  echo "retired DSpark launcher shorthand remains" >&2
-  exit 1
-fi
-grep -F -- '--spec-type draft-dspark' "$REPO/scripts/serve/serve-dsv4.sh" >/dev/null
+grep -F -- '--spec-dspark' "$REPO/scripts/serve/serve-dsv4.sh" >/dev/null
 grep -F -- '--spec-type draft-dspark' "$REPO/scripts/serve/serve-dsv4-0731.sh" >/dev/null
 
 echo "profile preflight tests: PASS"

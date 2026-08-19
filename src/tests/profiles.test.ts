@@ -64,7 +64,7 @@ test('loads all ten source profiles with launcher mappings', async () => {
   assert.equal(muse?.speculation?.p_min, 0.7);
 
   const dsv40731 = profiles.find(profile => profile.profile_id === 'dsv4-0731-dspark');
-  assert.equal(dsv40731?.draft?.[0]?.name, 'dspark-draft-0731.gguf');
+  assert.equal(dsv40731?.draft?.[0]?.name, 'dspark-draft-0731-upstream.gguf');
   assert.equal(dsv40731?.context.default, 8192);
   assert.equal(dsv40731?.context.qualified, 262144);
   assert.equal(dsv40731?.expert.speculation?.default, 'dspark');
