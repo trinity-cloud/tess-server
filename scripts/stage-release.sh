@@ -148,6 +148,7 @@ fi
 if strings - "$STAGE/bin/upstream/default.metallib" | grep -cE "/Users/[^/[:space:]]+" | grep -qv '^0$'; then
   echo "WARN: personal paths in upstream metallib"; fail=1
 fi
+strings - "$STAGE/bin/upstream/default.metallib" | grep -F 'kernel_mul_mv_ext_bf16_f32_r1_2' >/dev/null || { echo "FAIL: upstream metallib lacks required BF16 pipelines" >&2; exit 1; }
 if find "$STAGE" -type f \( -name "*.json" -o -name "*.jinja" -o -name "*.md" -o -name "*.sh" -o -name "*.txt" \) -print0 | xargs -0 grep -nE '/Users/[^/[:space:]]+' > "$STAGE_ROOT/text-pathleaks.txt" 2>/dev/null; then
   echo "WARN: personal paths in staged text:"; head -5 "$STAGE_ROOT/text-pathleaks.txt"; fail=1
 fi

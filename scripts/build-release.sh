@@ -79,6 +79,7 @@ SDK_PATH=$(xcrun --sdk macosx --show-sdk-path)
 SDK_VERSION=$(xcrun --sdk macosx --show-sdk-version)
 CLANG=$(xcrun --sdk macosx --find clang++)
 METAL=$(xcrun --sdk macosx --find metal)
+METALLIB=$(xcrun --sdk macosx --find metallib)
 
 mkdir -p "$BUILD_ROOT"
 BUILD_ROOT=$(CDPATH= cd -- "$BUILD_ROOT" && pwd)
@@ -136,9 +137,29 @@ configure_build() {
     ${tess_args[@]+"${tess_args[@]}"}
 }
 
+compile_upstream_metallib() {
+  local build
+  build=$1
+  cp "$SOURCE/ggml/src/ggml-common.h" "$build/bin/ggml-common.h"
+  cp "$SOURCE/ggml/src/ggml-metal/ggml-metal.metal" "$build/bin/ggml-metal.metal"
+  cp "$SOURCE/ggml/src/ggml-metal/ggml-metal-impl.h" "$build/bin/ggml-metal-impl.h"
+  (
+    cd "$build/bin"
+    "$METAL" -O3 -DGGML_METAL_HAS_BF16=1 -mmacosx-version-min="$MIN_MACOS" -c ggml-metal.metal -o default.air
+    "$METALLIB" default.air -o default.metallib
+    rm -f default.air ggml-common.h ggml-metal.metal ggml-metal-impl.h
+  )
+}
+
 for build in "$BUILD_A" "$BUILD_B"; do
   configure_build "$build" OFF "$PRODUCT_CONTRACT"
   SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH "$CMAKE" --build "$build" --target llama-server ggml-metal-lib -j 12
+  if [ "$PRODUCT_CONTRACT" = 0 ]; then
+    # Current upstream's offline CMake path omits the per-device BF16 feature
+    # define used by its runtime compiler. Recompile the external library with
+    # that same feature so BF16 model tensors cannot request absent pipelines.
+    compile_upstream_metallib "$build"
+  fi
   dsymutil "$build/bin/$OUTPUT_NAME" -o "$build/tess-server.dSYM"
   strip -S -x "$build/bin/$OUTPUT_NAME"
   codesign --force --sign - --timestamp=none "$build/bin/$OUTPUT_NAME"
