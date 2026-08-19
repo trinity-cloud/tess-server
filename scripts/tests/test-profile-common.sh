@@ -173,5 +173,11 @@ if grep -R 'REASONING_ARGS\[@\]' "$REPO/scripts/serve" >/dev/null; then
   echo "potentially empty reasoning-array expansion remains in a launcher" >&2
   exit 1
 fi
+if grep -R -- '--spec-dspark' "$REPO/scripts/serve" >/dev/null; then
+  echo "retired DSpark launcher shorthand remains" >&2
+  exit 1
+fi
+grep -F -- '--spec-type draft-dspark' "$REPO/scripts/serve/serve-dsv4.sh" >/dev/null
+grep -F -- '--spec-type draft-dspark' "$REPO/scripts/serve/serve-dsv4-0731.sh" >/dev/null
 
 echo "profile preflight tests: PASS"

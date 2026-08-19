@@ -51,5 +51,5 @@ fi
 tess_log_runtime_label
 cd "$TESS_RUNTIME_DIR"
 ARGS=(-m "$TESS_RUNTIME_MODEL" -c "$CTX" -ub "$UB" -np "$NP" -ngl 99 -fa on --jinja --metrics --slots --no-webui --no-ui-mcp-proxy --no-agent --alias "$ALIAS" --host 127.0.0.1 --port "$PORT")
-if [ "$DRAFT" = "1" ]; then ARGS+=(--spec-dspark "$TESS_RUNTIME_DRAFT" --spec-draft-n-max "$DMAX" --spec-draft-p-min "$PMIN"); fi
+if [ "$DRAFT" = "1" ]; then ARGS+=(-md "$TESS_RUNTIME_DRAFT" --spec-type draft-dspark --spec-draft-n-max "$DMAX" --spec-draft-p-min "$PMIN"); fi
 tess_exec_server "${ARGS[@]}"

@@ -109,6 +109,9 @@ else
 fi
 
 file "$STAGE/bin/upstream/tess-server" | grep -q 'Mach-O 64-bit executable arm64' || { echo "FAIL: upstream executable is not thin arm64" >&2; exit 1; }
+UPSTREAM_HELP=$("$STAGE/bin/upstream/tess-server" --help 2>&1)
+case "$UPSTREAM_HELP" in *--spec-draft-model*) ;; *) echo "FAIL: upstream executable lacks the packaged draft-model interface" >&2; exit 1 ;; esac
+case "$UPSTREAM_HELP" in *draft-dspark*) ;; *) echo "FAIL: upstream executable lacks DSpark speculation" >&2; exit 1 ;; esac
 UPSTREAM_BAD_DEPS=$(otool -L "$STAGE/bin/upstream/tess-server" | tail -n +2 | awk '{print $1}' | grep -Ev '^(/System/Library/|/usr/lib/)' || true)
 [ -z "$UPSTREAM_BAD_DEPS" ] || { echo "FAIL: upstream non-system runtime dependency: $UPSTREAM_BAD_DEPS" >&2; exit 1; }
 UPSTREAM_LOAD_COMMANDS=$(otool -l "$STAGE/bin/upstream/tess-server")
