@@ -225,14 +225,31 @@ fi
 if strings - "$STAGE/bin/upstream/default.metallib" | grep -cE "/Users/[^/[:space:]]+" | grep -qv '^0$'; then
   echo "WARN: personal paths in upstream metallib"; fail=1
 fi
-if strings - "$STAGE/bin/mlx/tess-mlx-server" | grep -E "/Users/[^/[:space:]]+" > "$STAGE_ROOT/mlx-pathleaks.txt" 2>/dev/null && [ -s "$STAGE_ROOT/mlx-pathleaks.txt" ]; then
-  echo "WARN: personal paths in Tess MLX server:"; sort -u "$STAGE_ROOT/mlx-pathleaks.txt" | head -5; fail=1
-fi
-for mlx_payload in "$STAGE/bin/mlx/libmlx.dylib" "$STAGE/bin/mlx/libjaccl.dylib" "$STAGE/bin/mlx/mlx.metallib"; do
-  if strings - "$mlx_payload" | grep -cE "/Users/[^/[:space:]]+" | grep -qv '^0$'; then
-    echo "WARN: personal paths in Tess MLX payload: $(basename -- "$mlx_payload")"; fail=1
+PINNED_MLX_UPSTREAM_METALLIB_PATH='/Users/runner/work/mlx/mlx/build/temp.macosx-11.0-arm64-cpython-310/mlx.core/mlx/backend/metal/kernels//mlx.metallib'
+scan_mlx_user_paths() {
+  local payload=$1 allowed=${2:-} name raw unexpected
+  name=$(basename -- "$payload")
+  raw="$STAGE_ROOT/$name-user-paths.txt"
+  unexpected="$STAGE_ROOT/$name-unexpected-user-paths.txt"
+  strings - "$payload" | grep -E "/Users/[^/[:space:]]+" > "$raw" 2>/dev/null || true
+  if [ -n "$allowed" ]; then
+    grep -Fvx "$allowed" "$raw" > "$unexpected" || true
+  else
+    cp "$raw" "$unexpected"
   fi
-done
+  if [ -s "$unexpected" ]; then
+    echo "WARN: personal paths in Tess MLX payload: $name"
+    sort -u "$unexpected" | head -5
+    fail=1
+  fi
+}
+scan_mlx_user_paths "$STAGE/bin/mlx/tess-mlx-server"
+# The exact, hash-pinned public MLX wheel embeds this GitHub Actions build
+# location as a fallback diagnostic string. It is not private customer or
+# developer data; every other /Users path remains a release failure.
+scan_mlx_user_paths "$STAGE/bin/mlx/libmlx.dylib" "$PINNED_MLX_UPSTREAM_METALLIB_PATH"
+scan_mlx_user_paths "$STAGE/bin/mlx/libjaccl.dylib"
+scan_mlx_user_paths "$STAGE/bin/mlx/mlx.metallib"
 strings - "$STAGE/bin/upstream/default.metallib" | grep -F 'kernel_mul_mv_ext_bf16_f32_r1_2' >/dev/null || { echo "FAIL: upstream metallib lacks required BF16 pipelines" >&2; exit 1; }
 if find "$STAGE" -type f \( -name "*.json" -o -name "*.jinja" -o -name "*.md" -o -name "*.sh" -o -name "*.txt" \) -print0 | xargs -0 grep -nE '/Users/[^/[:space:]]+' > "$STAGE_ROOT/text-pathleaks.txt" 2>/dev/null; then
   echo "WARN: personal paths in staged text:"; head -5 "$STAGE_ROOT/text-pathleaks.txt"; fail=1
