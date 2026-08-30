@@ -1,6 +1,7 @@
 #!/bin/bash
 # Recoverable per-user uninstall. Only the Tess Server engine installation is
-# moved to Trash; external models, settings, logs, and hash cache are preserved.
+# moved to Trash; external models, settings, logs, and the model library are
+# preserved.
 set -euo pipefail
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
@@ -21,4 +22,4 @@ TRASH_DEST="$TRASH_ROOT/tess-server-uninstalled-$STAMP"
 [ ! -e "$TRASH_DEST" ] || tess_install_die "uninstall destination already exists"
 /bin/mv "$INSTALL_ROOT" "$TRASH_DEST"
 printf 'tess-server engine moved to %s\n' "$TRASH_DEST"
-echo "Models, settings, logs, and the model-verification cache were not changed."
+echo "Models, settings, logs, and the model library were not changed."
