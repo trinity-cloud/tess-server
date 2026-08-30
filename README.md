@@ -25,7 +25,7 @@ tess-server doctor
 tess-server
 ```
 
-One package, no external dependencies: no Homebrew, no system Python, no separate engine install. The guided terminal app discovers GGUF and qualified MLX models on internal and attached storage, verifies them against versioned profiles, and serves them with managed settings. Model weights are not bundled; you obtain and store them under their respective licenses.
+One package, no external dependencies: no Homebrew, no system Python, no separate engine install. The terminal app opens on a persistent model library with separate **Tess MLX** and **GGUF** lanes. Browse to an existing model or explicitly download a curated model, then launch it with one recommended configuration. Model weights are not bundled and no network request occurs until you choose Download.
 
 ## The numbers
 
@@ -61,18 +61,19 @@ Speed never trades away correctness: **every accepted draft token is still verif
 
 Large-model serving on a Mac has real failure modes: out-of-memory panics, silently wrong context windows, mismatched draft files. Tess Server's open-source TUI manages them instead of handing you forty flags:
 
-- Discovers profiled MLX model directories and profiled or unprofiled GGUF models under `~/models`, `~/Models`, and `models` or `Models` folders on attached volumes, plus any folder you add from the TUI or with `--model-root`.
-- Verifies model files against hash-bound profiles before the first launch — a mismatch is a startup error, not a warning.
-- Keeps every configured context choice selectable. Qualified tiers carry the verified claim; experimental or untested tiers display an explicit warning while memory-critical settings remain managed.
-- Groups nearby projector and draft/MTP artifacts under unprofiled primary models, with detected defaults and a complete generic configuration screen for clearly labeled best-effort launches.
-- Shows the effective engine command before launch — nothing is hidden.
+- Makes the runtime explicit everywhere: **Tess MLX** for the compact MLX-native engine and **GGUF** for the optimized llama.cpp engine.
+- Shows a small, hardware-aware Recommended catalog and a persistent My Models library; Browse and Add path support local files, attached volumes, spaces, Unicode paths, and ordinary Hugging Face symlink layouts.
+- Inspects required files, byte lengths, indexes, metadata, tensor coverage, and runtime compatibility without re-reading tens of gigabytes to hash model contents.
+- Downloads only after explicit confirmation, from a pinned repository revision, with visible progress, safe resume, exact byte-count checks, and atomic completion.
+- Keeps context and a few product choices near the common path; batch, KV, speculation, and raw engine controls remain available under Advanced.
+- Renders model opening, weight loading, runtime preparation, API startup, health, and stale-load heartbeats as product state. Raw child logs stay behind `l`.
 - Starts, monitors, and cleanly shuts down a loopback-only OpenAI-compatible server, so the engine is never left running in the background.
 
 When a 128 GiB profile needs a larger macOS GPU-wired memory limit, the TUI prints the exact one-time-per-boot command. Tess Server never runs it, never requests administrator privileges, and never changes system settings itself.
 
-Profile support is exact-file specific. Other primary GGUF files are shown as **Unprofiled**, use conservative generic defaults, and carry no compatibility, verification, memory, correctness, or performance claim. Direct engine invocation remains available as the unrestricted expert escape hatch.
+Curated recipes are exact-artifact specific. Other primary GGUF files appear under **My Models** as **Local**, use conservative defaults, and remain fully configurable under Advanced. Direct engine invocation remains available as the unrestricted expert escape hatch.
 
-## Supported profiles
+## Supported model recipes
 
 The 0.1.6 release includes eleven profiles and adds Tess MLX, a C++ engine for the exact `mlx-community/DeepSeek-V4-Flash-0731-2.4bit-mixed` checkpoint. The adjacent MLX libraries and Metal library are bundled, relocatable, and checksum-bound; Python, oMLX, and mlx-lm are not product dependencies.
 
@@ -94,14 +95,14 @@ See [Supported models](docs/models.md) for context and memory guidance.
 
 ## Private by construction
 
-Privacy here is not a policy statement — it is how verified profile launches are built:
+Privacy here is not a policy statement — it is how managed launches are built:
 
 - The server binds to `127.0.0.1` only. Managed launches are never exposed to your LAN.
 - No telemetry, no update checks, no cloud fallback, no implicit downloads.
 - No prompt or generation logging by Tess Server.
 - Browser UI and built-in agent/tool surfaces are disabled at launch.
 - Optional bearer authentication backed by a private local key file — the key value is never stored in settings.
-- Model files are checksum-verified before a profile is labeled verified.
+- Local startup performs no telemetry, implicit model download, catalog refresh, or model-content hashing.
 
 If your work cannot leave your machine — security research, regulated code, client data — this is the deployment model that makes the promise checkable.
 
@@ -109,7 +110,7 @@ Tess Server is an inference server, not a security boundary for untrusted model 
 
 ## Connect a client
 
-Press `c` on the model list to set the port (default `8787`), API model name (default `local-llama-server`), and optional bearer authentication. Press `e` on model details for that profile's expert options.
+Press `,` on the model library to set the port (default `8787`), API model name (default `local-llama-server`), and optional bearer authentication. Press `i` for model details and `x` for Advanced settings.
 
 The default endpoint speaks the OpenAI API — point any existing client, agent, or IDE integration at it:
 
@@ -143,7 +144,7 @@ The interactive TUI is the recommended entry point. Scriptable commands are also
 ```bash
 tess-server profiles
 tess-server models --model-root /Volumes/Models
-tess-server verify --profile PROFILE_ID --model /path/to/model-or-mlx-directory
+tess-server inspect --profile PROFILE_ID --model /path/to/model-or-mlx-directory
 tess-server serve --profile PROFILE_ID --model /path/to/model-or-mlx-directory --context 32768
 tess-server doctor
 tess-server engine -- --help

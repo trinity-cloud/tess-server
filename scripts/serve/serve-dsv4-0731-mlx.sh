@@ -22,7 +22,7 @@ if [ "${PRINT_CONFIG:-0}" = 1 ]; then
 fi
 
 tess_preflight_port
-tess_verify_profile_files "$MODEL"
+tess_inspect_profile_files "$MODEL"
 tess_resolve_mlx_server
 tess_log_runtime_label
 

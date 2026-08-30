@@ -146,7 +146,7 @@ unset TESS_SERVER
 tess_profile_begin fixture
 tess_profile_begin_mlx dsv4-0731-mlx-24mixed
 [ "$TESS_ENGINE_VARIANT" = tess-mlx ]
-tess_verify_profile_files "$TEST_ROOT/models/mlx"
+tess_inspect_profile_files "$TEST_ROOT/models/mlx"
 tess_resolve_mlx_server
 [ "$TESS_MLX_SERVER" = "$TEST_ROOT/bin/mlx/tess-mlx-server" ]
 [ "$TESS_MLX_MODEL_PROFILE" = "$TEST_ROOT/share/tess-server/mlx/model-profile.json" ]
@@ -195,17 +195,15 @@ if (PORT=8787; ALIAS=fixture-server; API_KEY_FILE="$TEST_ROOT/api.key"; tess_val
   echo "insecure API key permission test failed" >&2
   exit 1
 fi
-tess_verify_profile_files "$TEST_ROOT/models/sample.gguf"
-tess_verify_profile_files "$TEST_ROOT/models/sample.gguf"
-[ -f "$TEST_ROOT/cache/$SAMPLE_SHA" ]
+tess_inspect_profile_files "$TEST_ROOT/models/sample.gguf"
+tess_inspect_profile_files "$TEST_ROOT/models/sample.gguf"
+[ -z "$(find "$TEST_ROOT/cache" -type f -print -quit)" ]
 cp -p "$TEST_ROOT/models/sample.gguf" "$TEST_ROOT/reference-time"
 sleep 1
 printf 'mutate\n' > "$TEST_ROOT/models/sample.gguf"
 touch -r "$TEST_ROOT/reference-time" "$TEST_ROOT/models/sample.gguf"
-if (tess_verify_profile_files "$TEST_ROOT/models/sample.gguf") >/dev/null 2>&1; then
-  echo "same-size restored-mtime tamper rejection test failed" >&2
-  exit 1
-fi
+# Structural inspection deliberately does not re-read same-size model content.
+tess_inspect_profile_files "$TEST_ROOT/models/sample.gguf"
 printf 'sample\n' > "$TEST_ROOT/models/sample.gguf"
 tess_prepare_runtime_links "$TEST_ROOT/models/sample.gguf"
 [ -L "$TESS_RUNTIME_DIR/sample.gguf" ]
@@ -220,16 +218,15 @@ if (tess_require_single_slot 2) >/dev/null 2>&1; then
 fi
 
 printf 'tampered\n' > "$TEST_ROOT/models/sample.gguf"
-if (tess_verify_profile_files "$TEST_ROOT/models/sample.gguf") >/dev/null 2>&1; then
+if (tess_inspect_profile_files "$TEST_ROOT/models/sample.gguf") >/dev/null 2>&1; then
   echo "tampered-file rejection test failed" >&2
   exit 1
 fi
 
-ALLOW_UNVERIFIED_MODEL=1
-TESS_RUNTIME_LABEL=verified
-TESS_CUSTOM_REASONS=
-tess_verify_profile_files "$TEST_ROOT/models/missing.gguf"
-[ "$TESS_RUNTIME_LABEL" = "custom" ]
+if (tess_inspect_profile_files "$TEST_ROOT/models/missing.gguf") >/dev/null 2>&1; then
+  echo "missing-file rejection test failed" >&2
+  exit 1
+fi
 
 NO_AUTH_OUTPUT=$(TESS_SERVER=/usr/bin/printf TESS_AUTH_MODE=off /bin/bash -c '. scripts/profile-common.sh; tess_exec_server "%s\\n" no-auth-ok')
 [ "$NO_AUTH_OUTPUT" = "no-auth-ok" ] || { echo "no-auth execution helper test failed" >&2; exit 1; }

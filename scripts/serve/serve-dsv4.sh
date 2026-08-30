@@ -42,10 +42,10 @@ if [ "$CUR" -lt "$REQ" ] 2>/dev/null || [ "$CUR" = "0" ]; then
 fi
 tess_preflight_port
 if [ "$DRAFT" = "1" ]; then
-  tess_verify_profile_files "$MODEL" "$DSPARK"
+  tess_inspect_profile_files "$MODEL" "$DSPARK"
   tess_prepare_runtime_links "$MODEL" "$DSPARK"
 else
-  tess_verify_profile_files "$MODEL"
+  tess_inspect_profile_files "$MODEL"
   tess_prepare_runtime_links "$MODEL"
 fi
 tess_log_runtime_label

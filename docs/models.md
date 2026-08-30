@@ -2,7 +2,9 @@
 
 Tess Server profiles match specific model artifacts to tested operating envelopes. A matching profile gives the TUI enough information to identify the required files, offer supported context choices, manage memory-sensitive settings, and label the resulting launch accurately.
 
-Model weights are not included and Tess Server does not download them. You are responsible for obtaining the files lawfully and following each model's license.
+Model weights are not included. Tess Server can explicitly download selected
+Featured entries after showing their source, immutable revision, license, size,
+and destination. You remain responsible for following each model's license.
 
 ## Current release profiles
 
@@ -45,13 +47,14 @@ Every context choice in this table is selectable. Qualification status changes
 the label and warning—not availability. An untested choice carries no
 compatibility, memory, correctness, quality, or performance claim.
 
-## Profile labels
+## Library labels
 
-- **Verified** — the packaged engine, model files, profile, and selected settings match a qualified combination.
-- **Custom** — a recognized profile is running with an operator-selected deviation from its qualified defaults.
-- **Unprofiled / best effort** — the TUI found a primary GGUF that does not match a packaged profile and launched it with conservative generic settings.
-- **Experimental** — the choice is available for testing but is not part of the profile's ordinary qualification claim.
-- **Untested / qualification pending** — the choice remains selectable, but the TUI warns that it carries no qualification claim.
+- **Recommended** — a curated catalog choice suitable for this Mac's memory class.
+- **Ready** — required local artifacts are structurally complete.
+- **Download** — a curated model is not present locally.
+- **Local** — a model added or found outside a Tess download receipt.
+- **Needs attention** — an actionable file, format, memory, or runtime issue.
+- **Running** — server health has reached Ready.
 
 ## Model discovery
 
@@ -65,14 +68,11 @@ The TUI searches:
 
 Multi-file models must keep all required shards together. An MLX model must remain in one directory with its safetensors index, tokenizer metadata, and every indexed weight shard. If a profile requires an additional companion file, it must also be present. The TUI reports missing files before launch.
 
-Discovery separates results into two sections:
-
-- **Profiled Models** match an exact packaged filename and retain the existing
-  verification and managed-profile workflow.
-- **Unprofiled Models** are other primary GGUF files. Multimodal projectors, MTP
-  models, and draft heads are associated with the primary model instead of being
-  shown as invalid standalone entries. Strong filename matches are preselected;
-  the configuration screen lets you disable or replace them.
+Discovery places curated choices in **Recommended** and saved/browsed models in
+**My Models**, inside the explicit Tess MLX or GGUF lane. Multimodal projectors,
+MTP models, and draft heads are associated with a primary GGUF rather than shown
+as invalid standalone entries. Strong filename matches are suggested; Advanced
+lets you disable or replace them.
 
 An unprofiled launch starts from usable, conservative defaults: 4K context,
 512 batch/ubatch, F16 K/V cache, all GPU layers, automatic Flash Attention, one
@@ -93,14 +93,17 @@ Tess Server cannot infer that an arbitrary model was trained for the selected
 window or that the machine has enough memory. Unprofiled launches carry no
 compatibility, verification, correctness, or performance claim.
 
-## File verification
+## Structural inspection
 
-Before the first verified launch, Tess Server checks that the local files match the packaged profile. Replacing or modifying a model causes verification to run again. A mismatch is a startup error rather than a warning.
+Normal startup does not hash model contents. Tess Server checks required files,
+exact byte lengths for catalog recipes, parseable index/config metadata,
+referenced shard coverage, and engine compatibility. The engine performs final
+tensor-name, shape, dtype, and quantization validation before inference. Missing,
+truncated, ambiguous, or incompatible models fail with an actionable category.
 
-Unprofiled models do not expose the verification action because Tess Server has no
-expected checksums or qualified configuration for them.
-
-This verification identifies the expected artifact; it does not grant a model license or establish that an untrusted model is safe.
+This inspection does not grant a model license or establish that an untrusted
+model is safe. `tess-server doctor` verifies the installed Tess engine payload;
+it never hashes user model weights.
 
 ## GPU-wired memory
 

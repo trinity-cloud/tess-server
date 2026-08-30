@@ -33,7 +33,7 @@ if [ "$CUR" -lt "$REQ" ] 2>/dev/null || [ "$CUR" = 0 ]; then
   exit 2
 fi
 tess_preflight_port
-tess_verify_profile_files "$MODEL"
+tess_inspect_profile_files "$MODEL"
 tess_prepare_runtime_links "$MODEL"
 tess_log_runtime_label
 cd "$TESS_RUNTIME_DIR"

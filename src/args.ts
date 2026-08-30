@@ -1,4 +1,4 @@
-export type CommandName = 'tui' | 'profiles' | 'models' | 'doctor' | 'verify' | 'serve' | 'engine' | 'help';
+export type CommandName = 'tui' | 'profiles' | 'models' | 'doctor' | 'inspect' | 'serve' | 'engine' | 'help';
 
 export interface CliOptions {
   command: CommandName;
@@ -24,7 +24,7 @@ export interface CliOptions {
   engineArgs: string[];
 }
 
-const commands = new Set<CommandName>(['tui', 'profiles', 'models', 'doctor', 'verify', 'serve', 'engine', 'help']);
+const commands = new Set<string>(['tui', 'profiles', 'models', 'doctor', 'inspect', 'verify', 'serve', 'engine', 'help']);
 
 function positiveInteger(name: string, value: string): number {
   const parsed = Number(value);
@@ -44,7 +44,7 @@ export function parseCliArgs(argv: string[]): CliOptions {
   const options: CliOptions = {command: 'tui', modelRoots: [], noAuth: false, printConfig: false, json: false, version: false, engineArgs: []};
   let index = 0;
   if (argv[0] && !argv[0].startsWith('-') && commands.has(argv[0] as CommandName)) {
-    options.command = argv[0] as CommandName;
+    options.command = argv[0] === 'verify' ? 'inspect' : argv[0] as CommandName;
     index = 1;
   }
   if (options.command === 'engine') {

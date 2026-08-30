@@ -54,7 +54,7 @@ if [ "${ALLOW_DIRTY_PACKAGE:-0}" != "1" ] && [ -n "$(git -C "$REPO" status --por
   echo "Set ALLOW_DIRTY_PACKAGE=1 only for a non-release stager test." >&2
   exit 1
 fi
-bash -n "$REPO/scripts/build-release.sh" "$REPO/scripts/sign-notarize-release.sh" "$REPO/scripts/profile-common.sh" "$REPO/scripts/verify-profile.sh" "$REPO/scripts/install-common.sh" "$REPO/scripts/install.sh" "$REPO/scripts/rollback.sh" "$REPO/scripts/uninstall.sh" "$REPO"/scripts/serve/*.sh "$REPO"/scripts/tests/*.sh
+bash -n "$REPO/scripts/build-release.sh" "$REPO/scripts/sign-notarize-release.sh" "$REPO/scripts/profile-common.sh" "$REPO/scripts/inspect-model.sh" "$REPO/scripts/verify-profile.sh" "$REPO/scripts/verify-payload.sh" "$REPO/scripts/install-common.sh" "$REPO/scripts/install.sh" "$REPO/scripts/rollback.sh" "$REPO/scripts/uninstall.sh" "$REPO"/scripts/serve/*.sh "$REPO"/scripts/tests/*.sh
 STAGE_ROOT=$(mktemp -d /tmp/tess-stage.XXXXXX)
 VERIFY_ROOT=
 trap 'rm -rf "$STAGE_ROOT" ${VERIFY_ROOT:+"$VERIFY_ROOT"}' EXIT
@@ -83,7 +83,7 @@ cp "$BIN/default.metallib"   "$STAGE/bin/default.metallib"
 cp "$UPSTREAM_BIN/llama-server"      "$STAGE/bin/upstream/tess-server"
 cp "$UPSTREAM_BIN/default.metallib"  "$STAGE/bin/upstream/default.metallib"
 cp "$REPO"/profiles/*.json   "$STAGE/profiles/"
-cp "$REPO/scripts/profile-common.sh" "$REPO/scripts/verify-profile.sh" "$REPO/scripts/install-common.sh" "$REPO/scripts/install.sh" "$REPO/scripts/rollback.sh" "$REPO/scripts/uninstall.sh" "$STAGE/scripts/"
+cp "$REPO/scripts/profile-common.sh" "$REPO/scripts/inspect-model.sh" "$REPO/scripts/verify-profile.sh" "$REPO/scripts/verify-payload.sh" "$REPO/scripts/install-common.sh" "$REPO/scripts/install.sh" "$REPO/scripts/rollback.sh" "$REPO/scripts/uninstall.sh" "$STAGE/scripts/"
 cp "$REPO"/scripts/serve/*.sh "$STAGE/scripts/serve/"
 cp "$PROVENANCE"                     "$STAGE/share/tess-server/build-provenance.json"
 cp "$UPSTREAM_PROVENANCE"            "$STAGE/share/tess-server/engines/upstream/build-provenance.json"
@@ -103,7 +103,7 @@ for license_file in "${LICENSE_FILES[@]}"; do
   cp "$REPO/licenses/$license_file" "$STAGE/share/tess-server/licenses/"
 done
 cp "$LICENSE_SOURCE"                 "$STAGE/share/tess-server/LICENSE"
-chmod 755 "$STAGE/bin/tess-server" "$STAGE/bin/upstream/tess-server" "$STAGE/bin/mlx/tess-mlx-server" "$STAGE/scripts/verify-profile.sh" "$STAGE/scripts/install.sh" "$STAGE/scripts/rollback.sh" "$STAGE/scripts/uninstall.sh" "$STAGE"/scripts/serve/*.sh
+chmod 755 "$STAGE/bin/tess-server" "$STAGE/bin/upstream/tess-server" "$STAGE/bin/mlx/tess-mlx-server" "$STAGE/scripts/inspect-model.sh" "$STAGE/scripts/verify-profile.sh" "$STAGE/scripts/verify-payload.sh" "$STAGE/scripts/install.sh" "$STAGE/scripts/rollback.sh" "$STAGE/scripts/uninstall.sh" "$STAGE"/scripts/serve/*.sh
 chmod 644 "$STAGE/bin/default.metallib" "$STAGE/bin/upstream/default.metallib" "$STAGE/bin/mlx/libmlx.dylib" "$STAGE/bin/mlx/libjaccl.dylib" "$STAGE/bin/mlx/mlx.metallib" "$STAGE/scripts/profile-common.sh" "$STAGE/scripts/install-common.sh" "$STAGE"/profiles/*.json "$STAGE"/share/tess-server/engines/upstream/build-provenance.json "$STAGE"/share/tess-server/licenses/*.txt "$STAGE"/share/tess-server/templates/*.jinja "$STAGE/share/tess-server/mlx/model-profile.json" "$STAGE/share/tess-server/mlx/tess-mlx-manifest.json"
 
 # --- product/static closure ---

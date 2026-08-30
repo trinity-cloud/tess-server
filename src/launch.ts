@@ -76,12 +76,12 @@ export function serveSpec(payloadRoot: string, candidate: ModelCandidate, overri
   };
 }
 
-export function verifySpec(payloadRoot: string, candidate: ModelCandidate): ProcessSpec {
-  if (candidate.kind !== 'profiled') throw new Error('unprofiled models do not have a Tess verification manifest');
+export function inspectSpec(payloadRoot: string, candidate: ModelCandidate): ProcessSpec {
+  if (candidate.kind !== 'profiled') throw new Error('local GGUF models are inspected directly during discovery');
   return {
     command: '/bin/bash',
     args: [
-      join(payloadRoot, 'scripts', 'verify-profile.sh'),
+      join(payloadRoot, 'scripts', 'inspect-model.sh'),
       candidate.profile.profile_id,
       candidate.modelPath,
       ...(candidate.draftPath ? [candidate.draftPath] : []),
@@ -90,6 +90,9 @@ export function verifySpec(payloadRoot: string, candidate: ModelCandidate): Proc
     env: {...process.env, TESS_PACKAGE_ROOT: payloadRoot},
   };
 }
+
+/** @deprecated Use inspectSpec. Kept for source compatibility with 0.1.x callers. */
+export const verifySpec = inspectSpec;
 
 export function engineSpec(payloadRoot: string, args: string[]): ProcessSpec {
   return {

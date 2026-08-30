@@ -6,7 +6,7 @@ import {render} from 'ink';
 import {parseCliArgs} from './args.js';
 import {launchOverridesFromResolved, resolveProfileConfiguration} from './configuration.js';
 import {candidateFromModelPath, defaultModelRoots, discoverModels, normalizeModelRoots} from './discovery.js';
-import {engineSpec, profileById, runForeground, serveSpec, verifySpec} from './launch.js';
+import {engineSpec, inspectSpec, profileById, runForeground, serveSpec} from './launch.js';
 import {readPackageVersion, requireRuntimePayload, resolveProfileRoot} from './paths.js';
 import {formatBytes, formatTokens, loadProfiles} from './profiles.js';
 import {assertAuthKeyFile, assertPortAvailable, loadServerSettings, validateServerSettings} from './server-settings.js';
@@ -20,17 +20,17 @@ function printHelp(): void {
 
 Usage:
   tess-server                                      Open the interactive model launcher
-  tess-server models [--model-root PATH]           Discover profiled and unprofiled GGUF models
+  tess-server models [--model-root PATH]           Discover local Tess MLX and GGUF models
   tess-server profiles [--json]                    List packaged model profiles
-  tess-server verify --profile ID --model PATH     Verify model identity without loading it
-  tess-server serve --profile ID --model PATH      Start a verified profile in the foreground
+  tess-server inspect --profile ID --model PATH    Inspect model structure without hashing it
+  tess-server serve --profile ID --model PATH      Start a model profile in the foreground
   tess-server doctor [--json]                      Check the bundled engine and release payload
   tess-server engine -- <args...>                  Invoke the proprietary engine directly
 
 Options:
   --model-root PATH   Add a folder to recursive model discovery (repeatable)
-  --draft PATH        Separate draft model required by a verified profile
-  --context TOKENS    Override the profile context (runtime becomes custom if different)
+  --draft PATH        Separate draft/MTP model required by a recipe
+  --context TOKENS    Override the recommended model context
   --speculation MODE  DeepSeek profile mode: dspark or off
   --draft-depth N     DeepSeek DSpark draft depth (1–5)
   --p-min N           DeepSeek confidence threshold (0–1)
@@ -81,10 +81,10 @@ async function main(): Promise<number> {
     if (options.json) {
       console.log(JSON.stringify(candidates, null, 2));
     } else if (candidates.length === 0) {
-      console.log(`No GGUF models found under: ${roots.join(', ') || '(no existing model roots)'}`);
+      console.log(`No Tess MLX or GGUF models found under: ${roots.join(', ') || '(no existing model roots)'}`);
     } else {
       for (const candidate of candidates) {
-        console.log(`${candidate.complete ? candidate.kind === 'profiled' ? 'ready' : 'best-effort' : 'incomplete'}\t${candidate.kind === 'profiled' ? candidate.profile.profile_id : 'unprofiled'}\t${candidate.modelPath}`);
+        console.log(`${candidate.complete ? candidate.kind === 'profiled' ? 'ready' : 'local' : 'needs-attention'}\t${candidate.kind === 'profiled' ? candidate.profile.profile_id : 'local-gguf'}\t${candidate.modelPath}`);
         for (const issue of candidate.issues) {
           console.log(`  - ${issue}`);
         }
@@ -95,6 +95,9 @@ async function main(): Promise<number> {
 
   const payloadRoot = await requireRuntimePayload(options.sidecarRoot);
   if (options.command === 'doctor') {
+    await execFileAsync('/bin/bash', [`${payloadRoot}/scripts/verify-payload.sh`], {
+      env: {...process.env, TESS_PACKAGE_ROOT: payloadRoot},
+    });
     const binary = `${payloadRoot}/bin/tess-server`;
     const {stdout} = await execFileAsync(binary, ['--version-json']);
     const engine = JSON.parse(stdout) as Record<string, unknown>;
@@ -124,7 +127,7 @@ async function main(): Promise<number> {
     return runForeground(engineSpec(payloadRoot, options.engineArgs));
   }
 
-  if (options.command === 'verify' || options.command === 'serve') {
+  if (options.command === 'inspect' || options.command === 'serve') {
     if (!options.profile || !options.model) {
       throw new Error(`${options.command} requires --profile and --model`);
     }
@@ -133,8 +136,8 @@ async function main(): Promise<number> {
     if (!candidate.complete) {
       throw new Error(`model set does not match profile ${profile.profile_id}: ${candidate.issues.join('; ')}`);
     }
-    if (options.command === 'verify') {
-      return runForeground(verifySpec(payloadRoot, candidate));
+    if (options.command === 'inspect') {
+      return runForeground(inspectSpec(payloadRoot, candidate));
     }
     const saved = await loadServerSettings();
     const serverSettings: ServerSettings = validateServerSettings({

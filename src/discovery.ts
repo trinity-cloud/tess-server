@@ -1,5 +1,4 @@
-import {createHash} from 'node:crypto';
-import {readFile, readdir, realpath, stat} from 'node:fs/promises';
+import {open, readFile, readdir, realpath, stat} from 'node:fs/promises';
 import {homedir} from 'node:os';
 import {basename, join, resolve} from 'node:path';
 import type {ModelCandidate, ProfileContextPreset, ProfileDescriptor, ProfileShard} from './types.js';
@@ -105,12 +104,34 @@ async function inspectCollection(directory: string, shards: ProfileShard[], issu
   }
 }
 
+async function inspectGgufHeader(path: string, issues: string[]): Promise<void> {
+  const name = basename(path);
+  let handle;
+  try {
+    handle = await open(path, 'r');
+    const header = Buffer.alloc(8);
+    const {bytesRead} = await handle.read(header, 0, header.length, 0);
+    if (bytesRead !== header.length || header.subarray(0, 4).toString('ascii') !== 'GGUF') {
+      issues.push(`${name} is not a GGUF file`);
+      return;
+    }
+    const version = header.readUInt32LE(4);
+    if (version < 1 || version > 3) issues.push(`${name} uses unsupported GGUF version ${version}`);
+  } catch {
+    if (!issues.some(issue => issue.includes(name))) issues.push(`cannot inspect ${name}`);
+  } finally {
+    await handle?.close();
+  }
+}
+
 async function matchesMlxProfileAnchor(path: string, shard: ProfileShard): Promise<boolean> {
   try {
     const info = await stat(path);
     if (!info.isFile() || info.size !== shard.bytes) return false;
-    const digest = createHash('sha256').update(await readFile(path)).digest('hex');
-    return digest === shard.sha256;
+    const index = JSON.parse(await readFile(path, 'utf8')) as {weight_map?: unknown};
+    if (!index.weight_map || typeof index.weight_map !== 'object' || Array.isArray(index.weight_map)) return false;
+    const referenced = Object.values(index.weight_map as Record<string, unknown>);
+    return referenced.length > 0 && referenced.every(value => typeof value === 'string' && value.endsWith('.safetensors'));
   } catch {
     return false;
   }
@@ -127,6 +148,7 @@ export async function candidateFromModelPath(profile: ProfileDescriptor, modelPa
     issues.push(`expected first shard ${profile.shards[0]?.name}`);
   }
   await inspectCollection(directory, profile.shards, issues);
+  if (!isMlx && profile.shards[0]) await inspectGgufHeader(resolved, issues);
   let draftPath: string | undefined;
   if (profile.draft?.[0]) {
     draftPath = explicitDraftPath ? resolve(expandHome(explicitDraftPath)) : join(directory, profile.draft[0].name);
@@ -134,6 +156,7 @@ export async function candidateFromModelPath(profile: ProfileDescriptor, modelPa
       issues.push(`expected first draft shard ${profile.draft[0].name}`);
     }
     await inspectCollection(resolve(draftPath, '..'), profile.draft, issues);
+    await inspectGgufHeader(draftPath, issues);
   }
   return {
     kind: 'profiled',
@@ -190,7 +213,7 @@ function companionScore(modelPath: string, companionPath: string): number {
   return 0;
 }
 
-async function genericCandidateFromModelPath(modelPath: string, allPaths: string[]): Promise<ModelCandidate | undefined> {
+export async function genericCandidateFromModelPath(modelPath: string, allPaths: string[]): Promise<ModelCandidate | undefined> {
   const name = basename(modelPath);
   const shardMatch = /^(.*)-(\d{5})-of-(\d{5})\.gguf$/i.exec(name);
   if (shardMatch && shardMatch[2] !== '00001') return undefined;
@@ -210,6 +233,7 @@ async function genericCandidateFromModelPath(modelPath: string, allPaths: string
     }
   }
   const bytes = shards.reduce((sum, shard) => sum + shard.bytes, 0);
+  if (shards.length > 0) await inspectGgufHeader(modelPath, issues);
   const modelName = genericModelName(modelPath);
   const nearbyCompanions = allPaths.filter(path => resolve(path, '..') === directory && path !== modelPath && companionKind(path));
   const mmproj = nearbyCompanions.filter(path => companionKind(path) === 'mmproj').sort((left, right) => companionScore(modelPath, right) - companionScore(modelPath, left) || left.localeCompare(right));
@@ -247,6 +271,32 @@ async function genericCandidateFromModelPath(modelPath: string, allPaths: string
     complete: issues.length === 0 && bytes > 0,
     issues,
   };
+}
+
+export async function candidateFromAnyPath(
+  profiles: ProfileDescriptor[],
+  selectedPath: string,
+  runtime: 'tess-mlx' | 'gguf',
+): Promise<ModelCandidate> {
+  const expanded = resolve(expandHome(selectedPath));
+  if (runtime === 'tess-mlx') {
+    const profile = profiles.find(item => item.model.format === 'mlx');
+    if (!profile) throw new Error('this Tess Server build has no Tess MLX profile');
+    return candidateFromModelPath(profile, expanded);
+  }
+  if (!expanded.toLowerCase().endsWith('.gguf')) {
+    throw new Error('choose a .gguf model file');
+  }
+  const known = profiles.find(profile =>
+    profile.model.format !== 'mlx' && profile.shards[0]?.name === basename(expanded));
+  if (known) return candidateFromModelPath(known, expanded);
+  const directory = resolve(expanded, '..');
+  const siblings = (await readdir(directory, {withFileTypes: true}))
+    .filter(entry => (entry.isFile() || entry.isSymbolicLink()) && entry.name.toLowerCase().endsWith('.gguf'))
+    .map(entry => join(directory, entry.name));
+  const candidate = await genericCandidateFromModelPath(expanded, siblings);
+  if (!candidate) throw new Error('choose the first shard of a GGUF model');
+  return candidate;
 }
 
 export async function discoverModels(profiles: ProfileDescriptor[], roots: string[], maxDepth = 6): Promise<ModelCandidate[]> {

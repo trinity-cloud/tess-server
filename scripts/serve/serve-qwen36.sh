@@ -39,7 +39,7 @@ if [ "${PRINT_CONFIG:-0}" = 1 ]; then
   exit 0
 fi
 tess_preflight_port
-tess_verify_profile_files "$MODEL"
+tess_inspect_profile_files "$MODEL"
 tess_prepare_runtime_links "$MODEL"
 tess_log_runtime_label
 cd "$TESS_RUNTIME_DIR"

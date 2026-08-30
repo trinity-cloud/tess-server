@@ -15,6 +15,11 @@ test('parses verified serve options', () => {
   assert.equal(options.port, 8787);
 });
 
+test('uses inspect terminology while accepting the legacy verify alias', () => {
+  assert.equal(parseCliArgs(['inspect', '--profile', 'fixture', '--model', '/tmp/model']).command, 'inspect');
+  assert.equal(parseCliArgs(['verify', '--profile', 'fixture', '--model', '/tmp/model']).command, 'inspect');
+});
+
 test('forwards raw engine arguments', () => {
   assert.deepEqual(parseCliArgs(['engine', '--', '--help']).engineArgs, ['--help']);
 });

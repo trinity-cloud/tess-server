@@ -1,22 +1,80 @@
 import {type ChildProcess} from 'node:child_process';
-import {basename, resolve} from 'node:path';
+import {readFile} from 'node:fs/promises';
+import {homedir, totalmem} from 'node:os';
+import {basename, join, resolve} from 'node:path';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Box, Text, useApp, useInput} from 'ink';
-import {genericBatchChoices, genericChatTemplateChoices, genericContextChoices, genericFlashAttentionChoices, genericGpuLayerChoices, genericKvChoices, genericReasoningChoices, genericReasoningFormatChoices, genericSlotChoices, genericSpeculationChoices, genericTriStateChoices, genericUbatchChoices, launchOverridesFromResolved, resolveProfileConfiguration, resolveUnprofiledConfiguration} from '../configuration.js';
-import {discoverModels} from '../discovery.js';
-import {serveSpec, spawnCaptured, stopCaptured, verifySpec} from '../launch.js';
+import {chooseModelPath} from '../browse.js';
+import {fetchRuntimeCapabilities} from '../capabilities.js';
+import {catalogForHost, embeddedCatalog, hostMemoryGiB} from '../catalog.js';
+import {
+  genericBatchChoices,
+  genericContextChoices,
+  genericFlashAttentionChoices,
+  genericSlotChoices,
+  genericUbatchChoices,
+  launchOverridesFromResolved,
+  resolveProfileConfiguration,
+  resolveUnprofiledConfiguration,
+} from '../configuration.js';
+import {candidateFromAnyPath, discoverModels} from '../discovery.js';
+import {downloadCatalogEntry, type DownloadProgress} from '../download.js';
+import {serveSpec, spawnCaptured, stopCaptured} from '../launch.js';
+import {
+  emptyLibrary,
+  entryFromCandidate,
+  loadModelLibrary,
+  removeLibraryEntry,
+  saveModelLibrary,
+  upsertLibraryEntry,
+} from '../library.js';
 import {formatBytes, formatTokens} from '../profiles.js';
-import {assertAuthKeyFile, assertPortAvailable, defaultServerSettings, saveServerSettings, validateServerSettings} from '../server-settings.js';
-import type {LaunchOverrides, ModelCandidate, ProfileDescriptor, ResolvedProfileConfiguration, ServerSettings} from '../types.js';
+import {coarseProgressFromLog, parseProgressLine, progressLabel, ProgressLineDecoder} from '../progress.js';
+import {
+  assertAuthKeyFile,
+  assertPortAvailable,
+  saveServerSettings,
+  validateServerSettings,
+} from '../server-settings.js';
+import type {
+  CatalogEntry,
+  LaunchOverrides,
+  LocalModelEntry,
+  ModelCandidate,
+  ModelLibrary,
+  ProfileDescriptor,
+  ResolvedProfileConfiguration,
+  RuntimeCapabilities,
+  RuntimeKind,
+  ServerSettings,
+  StartupProgress,
+} from '../types.js';
 import {Brand} from './Brand.js';
 
-type View = 'discovering' | 'models' | 'add-root' | 'details' | 'expert' | 'generic' | 'preview' | 'server' | 'process';
-type ProcessMode = 'serve' | 'verify';
+type View =
+  | 'library'
+  | 'manual-path'
+  | 'details'
+  | 'advanced'
+  | 'settings'
+  | 'download-confirm'
+  | 'downloading'
+  | 'process';
 type ProcessStatus = 'starting' | 'ready' | 'stopping' | 'exited' | 'failed';
-type ServerField = 'port' | 'alias' | 'auth' | 'key_file';
-type ExpertField = 'context' | 'speculation' | 'draft_depth' | 'p_min' | 'reasoning' | 'preserve_reasoning' | 'kv_quality';
-type GenericField = 'context' | 'batch' | 'ubatch' | 'cache_type_k' | 'cache_type_v' | 'gpu_layers' | 'flash_attention' | 'slots' | 'mmap' | 'mlock' | 'jinja' | 'chat_template' | 'reasoning' | 'reasoning_format' | 'reasoning_budget' | 'reasoning_preserve' | 'mmproj' | 'speculation' | 'draft_model' | 'draft_depth' | 'p_min' | 'extra_args';
-type GenericInputField = 'context' | 'batch' | 'ubatch' | 'gpu_layers' | 'slots' | 'chat_template' | 'reasoning_budget' | 'draft_depth' | 'p_min' | 'mmproj' | 'draft_model' | 'extra_args';
+type SettingsField = 'port' | 'alias' | 'auth' | 'key_file';
+type AdvancedField = 'context' | 'batch' | 'ubatch' | 'slots' | 'flash_attention';
+
+interface ModelRow {
+  id: string;
+  section: 'Recommended' | 'My Models';
+  runtime: RuntimeKind;
+  title: string;
+  description: string;
+  status: 'Ready' | 'Download' | 'Local' | 'Needs attention';
+  candidate?: ModelCandidate;
+  catalog?: CatalogEntry;
+  library?: LocalModelEntry;
+}
 
 export interface AppProps {
   profiles: ProfileDescriptor[];
@@ -27,168 +85,299 @@ export interface AppProps {
   version: string;
 }
 
-const ansiPattern = /\u001B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g;
-
-function cleanLines(chunk: string): string[] {
-  return chunk.replace(ansiPattern, '').split(/\r\n|\n|\r/).map(line => line.trimEnd()).filter(Boolean);
-}
-
-function modelSize(candidate: ModelCandidate): string {
-  return formatBytes(candidate.profile.shards.reduce((sum, shard) => sum + shard.bytes, 0));
-}
+const ansiPattern = /\u001B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/gu;
 
 function Key({children}: {children: React.ReactNode}): React.JSX.Element {
   return <Text color="cyan">{children}</Text>;
 }
 
-function runtimeColor(resolved: ResolvedProfileConfiguration): 'green' | 'yellow' | 'red' {
-  return resolved.runtimeLabel === 'verified' ? 'green' : resolved.runtimeLabel === 'rejected' ? 'red' : 'yellow';
+function runtimeName(runtime: RuntimeKind): string {
+  return runtime === 'tess-mlx' ? 'Tess MLX' : 'GGUF';
+}
+
+function runtimeColor(runtime: RuntimeKind): 'magenta' | 'cyan' {
+  return runtime === 'tess-mlx' ? 'magenta' : 'cyan';
+}
+
+function statusColor(status: ModelRow['status']): 'green' | 'yellow' | 'cyan' | 'red' {
+  if (status === 'Ready') return 'green';
+  if (status === 'Download') return 'yellow';
+  if (status === 'Local') return 'cyan';
+  return 'red';
+}
+
+function candidateRuntime(candidate: ModelCandidate): RuntimeKind {
+  return candidate.profile.model.format === 'mlx' ? 'tess-mlx' : 'gguf';
+}
+
+function modelBytes(candidate: ModelCandidate): number {
+  return [...candidate.profile.shards, ...(candidate.profile.draft ?? [])]
+    .reduce((sum, artifact) => sum + artifact.bytes, 0);
+}
+
+function samePath(left: string, right: string): boolean {
+  return resolve(left) === resolve(right);
+}
+
+function uniqueCandidates(candidates: ModelCandidate[]): ModelCandidate[] {
+  const seen = new Set<string>();
+  return candidates.filter(candidate => {
+    const key = `${candidateRuntime(candidate)}\u0000${resolve(candidate.modelPath)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function cycle<T>(values: readonly T[], current: T, direction: number): T {
-  const index = Math.max(values.indexOf(current), 0);
-  return values[(index + direction + values.length) % values.length] ?? current;
+  const position = Math.max(values.indexOf(current), 0);
+  return values[(position + direction + values.length) % values.length] ?? current;
 }
 
-function genericInputPatch(field: GenericInputField, rawValue: string): LaunchOverrides {
-  const value = rawValue.trim();
-  const integer = (): number => {
-    const parsed = Number(value);
-    if (!Number.isSafeInteger(parsed)) throw new Error(`${field.replaceAll('_', ' ')} must be an integer`);
-    return parsed;
+function progressPercent(progress: StartupProgress | DownloadProgress | undefined): number | undefined {
+  if (!progress) return undefined;
+  const total = 'totalBytes' in progress ? progress.totalBytes : progress.total;
+  const completed = 'completedBytes' in progress ? progress.completedBytes : progress.completed;
+  if (total === undefined || completed === undefined || total <= 0) return undefined;
+  return Math.max(0, Math.min(100, Math.round(completed / total * 100)));
+}
+
+function bar(percent: number | undefined, width = 34): string {
+  if (percent === undefined) return '━'.repeat(Math.max(8, Math.floor(width / 3)));
+  const filled = Math.round(width * percent / 100);
+  return `${'━'.repeat(filled)}${'─'.repeat(width - filled)}`;
+}
+
+function settingValue(settings: ServerSettings, field: SettingsField): string {
+  if (field === 'port') return String(settings.port);
+  if (field === 'alias') return settings.alias;
+  if (field === 'auth') return settings.auth.mode === 'off' ? 'Off (loopback only)' : 'Bearer key file';
+  return settings.auth.mode === 'file' ? settings.auth.key_file ?? '' : '';
+}
+
+function resolvedFor(candidate: ModelCandidate | undefined, overrides: LaunchOverrides): ResolvedProfileConfiguration | undefined {
+  if (!candidate) return undefined;
+  try {
+    return candidate.kind === 'profiled'
+      ? resolveProfileConfiguration(candidate.profile, overrides)
+      : resolveUnprofiledConfiguration(candidate, overrides);
+  } catch {
+    return undefined;
+  }
+}
+
+function phaseTitle(progress: StartupProgress | undefined): string {
+  if (!progress) return 'Starting';
+  const titles: Record<StartupProgress['phase'], string> = {
+    inspecting_model: 'Inspecting model',
+    opening_weights: 'Opening weights',
+    loading_weights: 'Loading weights',
+    preparing_runtime: 'Preparing runtime',
+    starting_api: 'Starting API',
+    ready: 'Ready',
   };
-  if (field === 'context') return {context: integer()};
-  if (field === 'batch') return {batch: integer()};
-  if (field === 'ubatch') return {ubatch: integer()};
-  if (field === 'gpu_layers') return {gpuLayers: value};
-  if (field === 'slots') return {slots: integer()};
-  if (field === 'chat_template') return {chatTemplate: value};
-  if (field === 'reasoning_budget') return {reasoningBudget: integer()};
-  if (field === 'draft_depth') return {draftDepth: integer()};
-  if (field === 'p_min') return {pMin: Number(value)};
-  if (field === 'mmproj') return {mmproj: value};
-  if (field === 'draft_model') return {draftModel: value};
-  return {rawEngineArgs: value};
+  return titles[progress.phase];
 }
 
-function shellQuote(value: string): string {
-  return /^[A-Za-z0-9_./:@%+=,-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`;
-}
-
-function genericLabel(field: GenericField | GenericInputField): string {
-  const labels: Record<GenericField, string> = {
-    context: 'Context', batch: 'Batch', ubatch: 'Ubatch', cache_type_k: 'KV cache K', cache_type_v: 'KV cache V',
-    gpu_layers: 'GPU layers', flash_attention: 'Flash Attention', slots: 'Slots', mmap: 'mmap', mlock: 'mlock',
-    jinja: 'Jinja', chat_template: 'Chat template', reasoning: 'Reasoning', reasoning_format: 'Reasoning format',
-    reasoning_budget: 'Reasoning budget', reasoning_preserve: 'Preserve reasoning', mmproj: 'Multimodal projector',
-    speculation: 'Speculation type', draft_model: 'Draft / MTP model', draft_depth: 'Draft depth',
-    p_min: 'Acceptance threshold', extra_args: 'Extra engine args',
-  };
-  return labels[field];
-}
-
-export function App({profiles, payloadRoot, initialModelRoots, initialServerSettings, initialContext, version}: AppProps): React.JSX.Element {
+export function App({
+  profiles,
+  payloadRoot,
+  initialModelRoots,
+  initialServerSettings,
+  initialContext,
+  version,
+}: AppProps): React.JSX.Element {
   const {exit} = useApp();
-  const [view, setView] = useState<View>('discovering');
-  const [roots, setRoots] = useState(initialModelRoots);
-  const [refreshToken, setRefreshToken] = useState(0);
+  const [view, setView] = useState<View>('library');
+  const [runtime, setRuntime] = useState<RuntimeKind>('tess-mlx');
+  const [library, setLibrary] = useState<ModelLibrary>(() => structuredClone(emptyLibrary));
   const [candidates, setCandidates] = useState<ModelCandidate[]>([]);
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [pathInput, setPathInput] = useState('');
-  const [discoveryError, setDiscoveryError] = useState<string>();
+  const [selectedByRuntime, setSelectedByRuntime] = useState<Record<RuntimeKind, number>>({'tess-mlx': 0, gguf: 0});
+  const [showOtherMacs, setShowOtherMacs] = useState(false);
+  const [scanning, setScanning] = useState(true);
+  const [message, setMessage] = useState('Loading your model library…');
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const [manualPath, setManualPath] = useState('');
   const [modelOverrides, setModelOverrides] = useState<Record<string, LaunchOverrides>>({});
-  const [expertIndex, setExpertIndex] = useState(0);
-  const [genericIndex, setGenericIndex] = useState(0);
-  const [genericInput, setGenericInput] = useState<{field: GenericInputField; value: string}>();
-  const [genericMessage, setGenericMessage] = useState<string>();
+  const [advancedIndex, setAdvancedIndex] = useState(0);
   const [serverSettings, setServerSettings] = useState(initialServerSettings);
-  const [serverDraft, setServerDraft] = useState(initialServerSettings);
-  const [serverIndex, setServerIndex] = useState(0);
-  const [serverInput, setServerInput] = useState<{field: ServerField; value: string}>();
-  const [serverMessage, setServerMessage] = useState<string>();
-  const [processMode, setProcessMode] = useState<ProcessMode>('serve');
+  const [settingsIndex, setSettingsIndex] = useState(0);
+  const [settingsInput, setSettingsInput] = useState<{field: SettingsField; value: string}>();
+  const [downloadProgress, setDownloadProgress] = useState<DownloadProgress>();
+  const [downloadError, setDownloadError] = useState<string>();
   const [processStatus, setProcessStatus] = useState<ProcessStatus>('starting');
   const [processExit, setProcessExit] = useState<string>();
+  const [startupProgress, setStartupProgress] = useState<StartupProgress>();
   const [logs, setLogs] = useState<string[]>([]);
-  const [health, setHealth] = useState('waiting for server');
+  const [showLogs, setShowLogs] = useState(false);
+  const [capabilities, setCapabilities] = useState<RuntimeCapabilities>();
   const [processNonce, setProcessNonce] = useState(0);
-  const [runningLabel, setRunningLabel] = useState('verified');
+  const [clock, setClock] = useState(() => Date.now());
   const childRef = useRef<ChildProcess | undefined>(undefined);
   const stopTimerRef = useRef<NodeJS.Timeout | undefined>(undefined);
-
-  const selected = candidates[selectedIndex];
-  const selectedOverrides = selected ? modelOverrides[selected.profile.profile_id] ?? {} : {};
-  const resolved = useMemo(() => selected ? selected.kind === 'profiled' ? resolveProfileConfiguration(selected.profile, selectedOverrides) : resolveUnprofiledConfiguration(selected, selectedOverrides) : undefined, [selected, selectedOverrides]);
-  const expertFields = useMemo<ExpertField[]>(() => {
-    if (!selected) return [];
-    const fields: ExpertField[] = ['context'];
-    if (selected.kind === 'unprofiled') return fields;
-    if (selected.profile.expert.speculation) fields.push('speculation', 'draft_depth', 'p_min');
-    if (selected.profile.expert.reasoning) fields.push('reasoning', 'preserve_reasoning');
-    if (selected.profile.expert.kv_quality) fields.push('kv_quality');
-    return fields;
-  }, [selected]);
-  const genericFields = useMemo<GenericField[]>(() => {
-    const fields: GenericField[] = ['context', 'batch', 'ubatch', 'cache_type_k', 'cache_type_v', 'gpu_layers', 'flash_attention', 'slots', 'mmap', 'mlock', 'jinja', 'chat_template', 'reasoning', 'reasoning_format', 'reasoning_budget', 'reasoning_preserve', 'mmproj', 'speculation'];
-    if (resolved?.runtimeLabel === 'unprofiled' && resolved.speculationType !== 'none') fields.push('draft_model', 'draft_depth', 'p_min');
-    fields.push('extra_args');
-    return fields;
-  }, [resolved?.runtimeLabel, resolved?.speculationType]);
-  const genericCommand = useMemo(() => {
-    if (!selected || selected.kind !== 'unprofiled') return '';
-    const spec = serveSpec(payloadRoot, selected, {
-      ...selectedOverrides,
-      port: serverSettings.port,
-      alias: serverSettings.alias,
-      ...(serverSettings.auth.mode === 'file' ? {apiKeyFile: serverSettings.auth.key_file} : {}),
-    });
-    return `tess-server engine -- ${spec.args.map(shellQuote).join(' ')}`;
-  }, [payloadRoot, selected, selectedOverrides, serverSettings]);
-  const serverFields = useMemo<ServerField[]>(() => ['port', 'alias', 'auth', ...(serverDraft.auth.mode === 'file' ? ['key_file' as const] : [])], [serverDraft.auth.mode]);
+  const downloadAbortRef = useRef<AbortController | undefined>(undefined);
+  const progressSequenceRef = useRef(0);
+  const processStartedAtRef = useRef(0);
+  const activeRuntimeRef = useRef<RuntimeKind>('gguf');
+  const authHeaderRef = useRef<Record<string, string>>({});
+  const catalog = useMemo(() => embeddedCatalog(profiles), [profiles]);
+  const visibleCatalog = useMemo(
+    () => showOtherMacs ? catalog : catalogForHost(catalog),
+    [catalog, showOtherMacs],
+  );
 
   useEffect(() => {
-    if (!selected || initialContext === undefined || modelOverrides[selected.profile.profile_id]?.context !== undefined) return;
-    setModelOverrides(current => ({...current, [selected.profile.profile_id]: {...(current[selected.profile.profile_id] ?? {}), context: initialContext}}));
-  }, [initialContext, selected?.profile.profile_id]);
+    let active = true;
+    const scan = async (): Promise<void> => {
+      setScanning(true);
+      try {
+        const saved = await loadModelLibrary();
+        if (!active) return;
+        setLibrary(saved);
+        setMessage(saved.entries.length > 0 ? 'Checking saved model locations…' : 'Scanning configured model folders…');
+        const savedCandidates = (await Promise.all(saved.entries.map(async entry => {
+          try { return await candidateFromAnyPath(profiles, entry.path, entry.runtime); }
+          catch { return undefined; }
+        }))).filter((candidate): candidate is ModelCandidate => Boolean(candidate));
+        if (active) setCandidates(uniqueCandidates(savedCandidates));
+        const discovered = await discoverModels(profiles, initialModelRoots);
+        if (!active) return;
+        setCandidates(uniqueCandidates([...savedCandidates, ...discovered]));
+        setMessage(discovered.length + savedCandidates.length > 0
+          ? 'Local models are ready. No network was contacted.'
+          : 'No local model found yet. Browse, add a path, or choose a download.');
+      } catch (error) {
+        if (active) setMessage(`Library needs attention: ${error instanceof Error ? error.message : String(error)}`);
+      } finally {
+        if (active) setScanning(false);
+      }
+    };
+    void scan();
+    return () => { active = false; };
+  }, [initialModelRoots.join('\u0000'), profiles, refreshNonce]);
 
-  const refresh = useCallback(async () => {
-    setView('discovering');
-    setDiscoveryError(undefined);
-    try {
-      const discovered = await discoverModels(profiles, roots);
-      setCandidates(discovered);
-      setSelectedIndex(index => Math.min(index, Math.max(discovered.length - 1, 0)));
-    } catch (error) {
-      setDiscoveryError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setView('models');
+  const rows = useMemo<ModelRow[]>(() => {
+    const output: ModelRow[] = [];
+    const usedPaths = new Set<string>();
+    for (const entry of visibleCatalog.filter(item => item.runtime === runtime)) {
+      const saved = library.entries.find(item => item.catalogId === entry.id);
+      const local = candidates.find(candidate =>
+        (saved && samePath(candidate.modelPath, saved.path)) || candidate.profile.profile_id === entry.profileId);
+      if (local) usedPaths.add(resolve(local.modelPath));
+      output.push({
+        id: `catalog:${entry.id}`,
+        section: 'Recommended',
+        runtime,
+        title: entry.displayName,
+        description: entry.description,
+        status: local?.complete ? 'Ready' : local ? 'Needs attention' : 'Download',
+        catalog: entry,
+        ...(local ? {candidate: local} : {}),
+        ...(saved ? {library: saved} : {}),
+      });
     }
-  }, [profiles, roots.join('\u0000'), refreshToken]);
+    for (const saved of library.entries.filter(item => item.runtime === runtime && !item.catalogId)) {
+      const local = candidates.find(candidate => samePath(candidate.modelPath, saved.path));
+      if (local) usedPaths.add(resolve(local.modelPath));
+      output.push({
+        id: `library:${saved.id}`,
+        section: 'My Models',
+        runtime,
+        title: saved.displayName,
+        description: saved.path,
+        status: local?.complete ? 'Local' : 'Needs attention',
+        library: saved,
+        ...(local ? {candidate: local} : {}),
+      });
+    }
+    for (const candidate of candidates.filter(item => candidateRuntime(item) === runtime && !usedPaths.has(resolve(item.modelPath)))) {
+      const matchingCatalog = visibleCatalog.find(entry => entry.profileId === candidate.profile.profile_id);
+      if (matchingCatalog) continue;
+      output.push({
+        id: `candidate:${candidate.profile.profile_id}:${candidate.modelPath}`,
+        section: 'My Models',
+        runtime,
+        title: candidate.profile.model.name,
+        description: candidate.modelPath,
+        status: candidate.complete ? 'Local' : 'Needs attention',
+        candidate,
+      });
+    }
+    return output;
+  }, [candidates, library, runtime, visibleCatalog]);
 
-  useEffect(() => { void refresh(); }, [refresh]);
+  const selectedIndex = Math.min(selectedByRuntime[runtime], Math.max(rows.length - 1, 0));
+  const selected = rows[selectedIndex];
+  const overrides = selected?.candidate ? modelOverrides[selected.candidate.profile.profile_id] ?? {} : {};
+  const resolved = useMemo(() => resolvedFor(selected?.candidate, overrides), [selected?.candidate, overrides]);
+  const settingsFields = useMemo<SettingsField[]>(
+    () => ['port', 'alias', 'auth', ...(serverSettings.auth.mode === 'file' ? ['key_file' as const] : [])],
+    [serverSettings.auth.mode],
+  );
+  const advancedFields = useMemo<AdvancedField[]>(
+    () => selected?.candidate?.kind === 'unprofiled'
+      ? ['context', 'batch', 'ubatch', 'slots', 'flash_attention']
+      : ['context'],
+    [selected?.candidate?.kind],
+  );
+
+  useEffect(() => {
+    if (!selected?.candidate || initialContext === undefined) return;
+    const key = selected.candidate.profile.profile_id;
+    setModelOverrides(current => current[key]?.context !== undefined
+      ? current
+      : {...current, [key]: {...(current[key] ?? {}), context: initialContext}});
+  }, [initialContext, selected?.candidate]);
 
   const updateOverride = useCallback((patch: LaunchOverrides) => {
-    if (!selected) return;
-    setModelOverrides(current => ({...current, [selected.profile.profile_id]: {...(current[selected.profile.profile_id] ?? {}), ...patch}}));
-  }, [selected]);
+    if (!selected?.candidate) return;
+    const key = selected.candidate.profile.profile_id;
+    setModelOverrides(current => ({...current, [key]: {...(current[key] ?? {}), ...patch}}));
+  }, [selected?.candidate]);
 
-  const updateGenericOverride = useCallback((patch: LaunchOverrides): boolean => {
-    if (!selected || selected.kind !== 'unprofiled') return false;
-    const next = {...selectedOverrides, ...patch};
+  const addCandidate = useCallback(async (candidate: ModelCandidate, catalogEntry?: CatalogEntry) => {
+    const entry = await entryFromCandidate(candidate, catalogEntry);
+    const updated = upsertLibraryEntry(library, entry);
+    await saveModelLibrary(updated);
+    setLibrary(updated);
+    setCandidates(current => uniqueCandidates([candidate, ...current]));
+    setRuntime(candidateRuntime(candidate));
+    setSelectedByRuntime(current => ({...current, [candidateRuntime(candidate)]: 0}));
+    setMessage(candidate.complete
+      ? `${candidate.profile.model.name} added. Model files were inspected without content hashing.`
+      : `${candidate.profile.model.name} added, but it needs attention: ${candidate.issues.join('; ')}`);
+    setView('library');
+  }, [library]);
+
+  const browse = useCallback(async () => {
+    setMessage(`Opening the macOS ${runtime === 'tess-mlx' ? 'folder' : 'file'} chooser…`);
     try {
-      resolveUnprofiledConfiguration(selected, next);
-      setModelOverrides(current => ({...current, [selected.profile.profile_id]: next}));
-      setGenericMessage(undefined);
-      return true;
+      const path = await chooseModelPath(runtime);
+      if (!path) {
+        setMessage('Browse cancelled. Press a to enter a path manually.');
+        return;
+      }
+      const candidate = await candidateFromAnyPath(profiles, path, runtime);
+      const catalogEntry = catalog.find(entry => entry.profileId === candidate.profile.profile_id);
+      await addCandidate(candidate, catalogEntry);
     } catch (error) {
-      setGenericMessage(error instanceof Error ? error.message : String(error));
-      return false;
+      setMessage(`Could not add model: ${error instanceof Error ? error.message : String(error)}`);
     }
-  }, [selected, selectedOverrides]);
+  }, [addCandidate, catalog, profiles, runtime]);
 
-  const appendLog = useCallback((chunk: string) => {
-    const next = cleanLines(chunk);
-    if (next.length > 0) setLogs(current => [...current, ...next].slice(-18));
+  const appendOutput = useCallback((chunk: string, decoder: ProgressLineDecoder) => {
+    const lines = decoder.push(chunk.replace(ansiPattern, ''));
+    for (const line of lines) {
+      const structured = parseProgressLine(line);
+      if (structured) {
+        setStartupProgress(current => !current || structured.sequence > current.sequence ? structured : current);
+        progressSequenceRef.current = Math.max(progressSequenceRef.current, structured.sequence);
+      } else if (activeRuntimeRef.current === 'gguf') {
+        const coarse = coarseProgressFromLog(line, ++progressSequenceRef.current, processStartedAtRef.current);
+        if (coarse) setStartupProgress(coarse);
+      }
+      if (!line.includes('TESS_PROGRESS ')) setLogs(current => [...current, line].slice(-200));
+    }
   }, []);
 
   const stopChild = useCallback(() => {
@@ -196,377 +385,447 @@ export function App({profiles, payloadRoot, initialModelRoots, initialServerSett
     if (!child || child.exitCode !== null || child.killed) return;
     setProcessStatus('stopping');
     stopCaptured(child, 'SIGINT');
-    stopTimerRef.current = setTimeout(() => { if (child.exitCode === null) stopCaptured(child, 'SIGTERM'); }, 5000);
+    stopTimerRef.current = setTimeout(() => {
+      if (child.exitCode === null) stopCaptured(child, 'SIGTERM');
+    }, 5000);
   }, []);
 
   useEffect(() => () => {
     if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
     const child = childRef.current;
     if (child && child.exitCode === null) stopCaptured(child, 'SIGTERM');
+    downloadAbortRef.current?.abort();
   }, []);
 
-  const beginProcess = useCallback(async (mode: ProcessMode) => {
-    if (!selected || !resolved) return;
-    if (mode === 'verify' && selected.kind !== 'profiled') {
-      setProcessMode(mode);
-      setLogs(['Unprofiled GGUF files do not have a Tess verification manifest.']);
-      setProcessStatus('failed');
-      setProcessExit('verification unavailable');
-      setView('process');
+  const launch = useCallback(async () => {
+    if (!selected?.candidate || !selected.candidate.complete || !resolved?.startable) {
+      setMessage('This model needs attention before it can launch. Open Details for the exact issue.');
+      setView('details');
       return;
     }
-    if (!selected.complete || (mode === 'serve' && !resolved.startable)) {
-      setProcessMode(mode);
-      setLogs([...selected.issues, ...(resolved.rejection ? [resolved.rejection] : [])]);
-      setProcessStatus('failed');
-      setProcessExit(!selected.complete ? 'model set is incomplete' : 'configuration rejected');
-      setView('process');
-      return;
-    }
-    setProcessMode(mode);
     setProcessStatus('starting');
     setProcessExit(undefined);
-    setHealth(mode === 'serve' ? 'waiting for server' : 'not applicable');
-    setLogs([mode === 'serve' ? selected.kind === 'profiled' ? `Starting ${resolved.runtimeLabel.toUpperCase()} profile launcher…` : 'Starting UNPROFILED generic engine launch…' : 'Verifying model files…']);
-    setRunningLabel(resolved.runtimeLabel);
+    setStartupProgress(undefined);
+    setCapabilities(undefined);
+    setLogs([]);
+    setShowLogs(false);
     setView('process');
+    progressSequenceRef.current = 0;
+    processStartedAtRef.current = Date.now();
+    activeRuntimeRef.current = selected.runtime;
     try {
-      if (mode === 'serve') {
-        await assertAuthKeyFile(serverSettings);
-        await assertPortAvailable(serverSettings.port);
+      await assertAuthKeyFile(serverSettings);
+      await assertPortAvailable(serverSettings.port);
+      authHeaderRef.current = {};
+      if (serverSettings.auth.mode === 'file') {
+        authHeaderRef.current = {Authorization: `Bearer ${(await readFile(serverSettings.auth.key_file!, 'utf8')).trim()}`};
       }
-      const spec = mode === 'serve' ? serveSpec(payloadRoot, selected, {
-        ...(selected.kind === 'profiled' ? launchOverridesFromResolved(resolved) : selectedOverrides),
+      const spec = serveSpec(payloadRoot, selected.candidate, {
+        ...(selected.candidate.kind === 'profiled' ? launchOverridesFromResolved(resolved) : overrides),
         port: serverSettings.port,
         alias: serverSettings.alias,
         ...(serverSettings.auth.mode === 'file' ? {apiKeyFile: serverSettings.auth.key_file} : {}),
-      }) : verifySpec(payloadRoot, selected);
+      });
       const child = spawnCaptured(spec);
       childRef.current = child;
       setProcessNonce(value => value + 1);
-      child.stdout?.on('data', chunk => appendLog(String(chunk)));
-      child.stderr?.on('data', chunk => appendLog(String(chunk)));
-      child.once('error', error => { appendLog(error.message); setProcessStatus('failed'); setProcessExit('process could not start'); });
+      const stdoutDecoder = new ProgressLineDecoder();
+      const stderrDecoder = new ProgressLineDecoder();
+      child.stdout?.on('data', chunk => appendOutput(String(chunk), stdoutDecoder));
+      child.stderr?.on('data', chunk => appendOutput(String(chunk), stderrDecoder));
+      child.once('error', error => {
+        setLogs(current => [...current, error.message].slice(-200));
+        setProcessStatus('failed');
+        setProcessExit('process could not start');
+      });
       child.once('exit', (code, signal) => {
+        for (const line of [...stdoutDecoder.finish(), ...stderrDecoder.finish()]) {
+          if (!line.includes('TESS_PROGRESS ')) setLogs(current => [...current, line].slice(-200));
+        }
         if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
-        setProcessStatus(code === 0 ? 'exited' : 'failed');
+        setProcessStatus(current => current === 'ready' && code === 0 ? 'exited' : code === 0 ? 'exited' : 'failed');
         setProcessExit(code === null ? `signal ${signal ?? 'unknown'}` : `exit ${code}`);
       });
     } catch (error) {
-      appendLog(error instanceof Error ? error.message : String(error));
+      setLogs([error instanceof Error ? error.message : String(error)]);
       setProcessStatus('failed');
       setProcessExit('preflight failed');
     }
-  }, [appendLog, payloadRoot, resolved, selected, selectedOverrides, serverSettings]);
+  }, [appendOutput, overrides, payloadRoot, resolved, selected, serverSettings]);
 
   useEffect(() => {
-    if (view !== 'process' || processMode !== 'serve' || processStatus === 'exited' || processStatus === 'failed') return;
-    let cancelled = false;
-    const check = async (): Promise<void> => {
-      try {
-        const response = await fetch(`http://127.0.0.1:${serverSettings.port}/health`, {signal: AbortSignal.timeout(900)});
-        if (!cancelled && response.ok) { setHealth('ready'); setProcessStatus('ready'); }
-        else if (!cancelled) setHealth(`loading (HTTP ${response.status})`);
-      } catch { if (!cancelled) setHealth('loading'); }
-    };
-    void check();
-    const timer = setInterval(() => void check(), 1000);
-    return () => { cancelled = true; clearInterval(timer); };
-  }, [processMode, processNonce, processStatus, serverSettings.port, view]);
+    if (view !== 'process' || processStatus !== 'starting' || processNonce === 0) return;
+    const controller = new AbortController();
+    const base = `http://127.0.0.1:${serverSettings.port}`;
+    const poll = setInterval(() => {
+      void fetch(`${base}/health`, {headers: authHeaderRef.current, signal: controller.signal})
+        .then(response => {
+          if (!response.ok) return;
+          setProcessStatus('ready');
+          setStartupProgress({
+            schemaVersion: 1,
+            sequence: ++progressSequenceRef.current,
+            phase: 'ready',
+            elapsedMs: Date.now() - processStartedAtRef.current,
+            message: 'Server ready',
+            receivedAt: Date.now(),
+          });
+          clearInterval(poll);
+          void fetchRuntimeCapabilities(base, (input, init) => fetch(input, {
+            ...init,
+            headers: {...Object.fromEntries(new Headers(init?.headers).entries()), ...authHeaderRef.current},
+          })).then(setCapabilities).catch(() => undefined);
+        })
+        .catch(() => undefined);
+    }, 500);
+    return () => { clearInterval(poll); controller.abort(); };
+  }, [processNonce, processStatus, serverSettings.port, view]);
 
-  const changeExpert = useCallback((direction: number) => {
-    if (!selected || !resolved) return;
-    const field = expertFields[expertIndex];
-    if (field === 'context') {
-      const values = selected.profile.expert.context_presets.map(preset => preset.tokens);
-      updateOverride({context: cycle(values, resolved.context, direction)});
-    } else if (field === 'speculation' && selected.profile.expert.speculation && resolved.speculation) {
-      updateOverride({speculation: cycle(selected.profile.expert.speculation.options, resolved.speculation, direction)});
-    } else if (field === 'draft_depth' && selected.profile.expert.speculation && resolved.draftDepth !== undefined) {
-      const values = Array.from({length: selected.profile.expert.speculation.draft_depth_max - selected.profile.expert.speculation.draft_depth_min + 1}, (_, index) => selected.profile.expert.speculation!.draft_depth_min + index);
-      updateOverride({draftDepth: cycle(values, resolved.draftDepth, direction)});
-    } else if (field === 'p_min' && selected.profile.expert.speculation && resolved.pMin !== undefined) {
-      updateOverride({pMin: cycle(selected.profile.expert.speculation.p_min_presets, resolved.pMin, direction)});
-    } else if (field === 'reasoning' && selected.profile.expert.reasoning && resolved.reasoning) {
-      updateOverride({reasoning: cycle(selected.profile.expert.reasoning.options, resolved.reasoning, direction)});
-    } else if (field === 'preserve_reasoning' && resolved.preserveReasoning !== undefined && resolved.reasoning !== 'off') {
-      updateOverride({preserveReasoning: !resolved.preserveReasoning});
-    } else if (field === 'kv_quality' && selected.profile.expert.kv_quality && resolved.kvQuality) {
-      updateOverride({kvQuality: cycle(selected.profile.expert.kv_quality.options.map(option => option.id), resolved.kvQuality, direction)});
+  useEffect(() => {
+    if (view !== 'process' || (processStatus !== 'starting' && processStatus !== 'stopping')) return;
+    setClock(Date.now());
+    const timer = setInterval(() => setClock(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [processStatus, view]);
+
+  const beginDownload = useCallback(async () => {
+    if (!selected?.catalog) return;
+    const controller = new AbortController();
+    downloadAbortRef.current = controller;
+    setDownloadError(undefined);
+    setDownloadProgress({phase: 'preparing', completedBytes: 0, totalBytes: selected.catalog.diskBytes});
+    setView('downloading');
+    const root = process.env.TESS_SERVER_MODEL_DOWNLOAD_ROOT ?? join(
+      homedir(), 'Library', 'Application Support', 'Trinity Cloud', 'Tess Server', 'Models',
+    );
+    try {
+      const directory = await downloadCatalogEntry(selected.catalog, {
+        destinationRoot: root,
+        signal: controller.signal,
+        onProgress: setDownloadProgress,
+      });
+      const profile = profiles.find(item => item.profile_id === selected.catalog!.profileId);
+      if (!profile) throw new Error('downloaded model profile is unavailable');
+      const path = selected.runtime === 'tess-mlx' ? directory : join(directory, profile.shards[0]!.name);
+      const candidate = await candidateFromAnyPath(profiles, path, selected.runtime);
+      await addCandidate(candidate, selected.catalog);
+    } catch (error) {
+      setDownloadError(error instanceof Error && error.name === 'AbortError'
+        ? 'Download paused. The partial files are retained for a safe resume.'
+        : error instanceof Error ? error.message : String(error));
     }
-  }, [expertFields, expertIndex, resolved, selected, updateOverride]);
+  }, [addCandidate, profiles, selected]);
 
-  const changeGeneric = useCallback((direction: number) => {
-    if (!selected || selected.kind !== 'unprofiled' || !resolved) return;
-    const field = genericFields[genericIndex];
-    if (field === 'context') updateGenericOverride({context: cycle(genericContextChoices, resolved.context, direction)});
-    else if (field === 'batch') updateGenericOverride({batch: cycle(genericBatchChoices, resolved.batch, direction)});
-    else if (field === 'ubatch') updateGenericOverride({ubatch: cycle(genericUbatchChoices.filter(value => value <= resolved.batch), resolved.ubatch, direction)});
-    else if (field === 'cache_type_k' && resolved.cacheTypeK) updateGenericOverride({cacheTypeK: cycle(genericKvChoices, resolved.cacheTypeK, direction)});
-    else if (field === 'cache_type_v' && resolved.cacheTypeV) updateGenericOverride({cacheTypeV: cycle(genericKvChoices, resolved.cacheTypeV, direction)});
-    else if (field === 'gpu_layers' && resolved.gpuLayers) updateGenericOverride({gpuLayers: cycle(genericGpuLayerChoices, resolved.gpuLayers as typeof genericGpuLayerChoices[number], direction)});
-    else if (field === 'flash_attention' && resolved.flashAttention) updateGenericOverride({flashAttention: cycle(genericFlashAttentionChoices, resolved.flashAttention, direction)});
-    else if (field === 'slots' && resolved.slots) updateGenericOverride({slots: cycle(genericSlotChoices, resolved.slots, direction)});
-    else if (field === 'mmap') updateGenericOverride({mmap: !resolved.mmap});
-    else if (field === 'mlock') updateGenericOverride({mlock: !resolved.mlock});
-    else if (field === 'jinja') updateGenericOverride({jinja: !resolved.jinja});
-    else if (field === 'chat_template') updateGenericOverride({chatTemplate: cycle(genericChatTemplateChoices, resolved.chatTemplate ?? '', direction)});
-    else if (field === 'reasoning' && resolved.genericReasoning) updateGenericOverride({genericReasoning: cycle(genericReasoningChoices, resolved.genericReasoning, direction)});
-    else if (field === 'reasoning_format' && resolved.reasoningFormat) updateGenericOverride({reasoningFormat: cycle(genericReasoningFormatChoices, resolved.reasoningFormat, direction)});
-    else if (field === 'reasoning_budget' && resolved.reasoningBudget !== undefined) updateGenericOverride({reasoningBudget: cycle([-1, 0, 1024, 4096, 8192], resolved.reasoningBudget, direction)});
-    else if (field === 'reasoning_preserve' && resolved.reasoningPreserve) updateGenericOverride({reasoningPreserve: cycle(genericTriStateChoices, resolved.reasoningPreserve, direction)});
-    else if (field === 'mmproj') updateGenericOverride({mmproj: cycle(['', ...(selected.companions?.mmproj ?? [])], resolved.mmproj ?? '', direction)});
-    else if (field === 'speculation' && resolved.speculationType) updateGenericOverride({speculationType: cycle(genericSpeculationChoices, resolved.speculationType, direction)});
-    else if (field === 'draft_model') updateGenericOverride({draftModel: cycle(['', ...(selected.companions?.draft ?? [])], resolved.draftModel ?? '', direction)});
-    else if (field === 'draft_depth' && resolved.draftDepth !== undefined) updateGenericOverride({draftDepth: cycle([1, 2, 3, 4, 5, 6, 7, 8], resolved.draftDepth, direction)});
-    else if (field === 'p_min' && resolved.pMin !== undefined) updateGenericOverride({pMin: cycle([0, 0.3, 0.5, 0.7, 0.9], resolved.pMin, direction)});
-  }, [genericFields, genericIndex, resolved, selected, updateGenericOverride]);
+  const saveSettingInput = useCallback(async () => {
+    if (!settingsInput) return;
+    try {
+      const next: ServerSettings = settingsInput.field === 'port'
+        ? {...serverSettings, port: Number(settingsInput.value)}
+        : settingsInput.field === 'alias'
+          ? {...serverSettings, alias: settingsInput.value}
+          : {...serverSettings, auth: {mode: 'file', key_file: settingsInput.value}};
+      const validated = validateServerSettings(next);
+      await saveServerSettings(validated);
+      setServerSettings(validated);
+      setSettingsInput(undefined);
+      setMessage('Server settings saved.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    }
+  }, [serverSettings, settingsInput]);
 
-  const beginGenericInput = useCallback(() => {
-    if (!resolved) return;
-    const field = genericFields[genericIndex];
-    const editable = new Set<GenericField>(['context', 'batch', 'ubatch', 'gpu_layers', 'slots', 'chat_template', 'reasoning_budget', 'draft_depth', 'p_min', 'mmproj', 'draft_model', 'extra_args']);
-    if (!field || !editable.has(field)) return;
-    const values: Partial<Record<GenericInputField, string>> = {
-      context: String(resolved.context),
-      batch: String(resolved.batch),
-      ubatch: String(resolved.ubatch),
-      gpu_layers: resolved.gpuLayers ?? 'all',
-      slots: String(resolved.slots ?? 1),
-      chat_template: resolved.chatTemplate ?? '',
-      reasoning_budget: String(resolved.reasoningBudget ?? -1),
-      draft_depth: String(resolved.draftDepth ?? 3),
-      p_min: String(resolved.pMin ?? 0),
-      mmproj: resolved.mmproj ?? '',
-      draft_model: resolved.draftModel ?? '',
-      extra_args: resolved.rawEngineArgs ?? '',
-    };
-    setGenericInput({field: field as GenericInputField, value: values[field as GenericInputField] ?? ''});
-    setGenericMessage(undefined);
-  }, [genericFields, genericIndex, resolved]);
+  const changeAdvanced = useCallback((direction: number) => {
+    if (!selected?.candidate || !resolved) return;
+    const field = advancedFields[advancedIndex];
+    if (field === 'context') {
+      const values = selected.candidate.kind === 'profiled'
+        ? selected.candidate.profile.expert.context_presets
+          .filter(preset => preset.availability !== 'qualification-pending').map(preset => preset.tokens)
+        : [...genericContextChoices];
+      updateOverride({context: cycle(values, resolved.context, direction)});
+    } else if (field === 'batch') {
+      updateOverride({batch: cycle(genericBatchChoices, resolved.batch, direction)});
+    } else if (field === 'ubatch') {
+      updateOverride({ubatch: cycle(genericUbatchChoices, resolved.ubatch, direction)});
+    } else if (field === 'slots') {
+      updateOverride({slots: cycle(genericSlotChoices, resolved.slots ?? 1, direction)});
+    } else if (field === 'flash_attention') {
+      updateOverride({flashAttention: cycle(genericFlashAttentionChoices, resolved.flashAttention ?? 'auto', direction)});
+    }
+  }, [advancedFields, advancedIndex, resolved, selected?.candidate, updateOverride]);
 
   useInput((input, key) => {
-    if (view === 'add-root') {
-      if (key.escape) { setPathInput(''); setView('models'); }
-      else if (key.return) { const value = pathInput.trim(); if (value) setRoots(current => [...new Set([...current, resolve(value.replace(/^~(?=\/|$)/, process.env.HOME ?? '~'))])]); setPathInput(''); }
-      else if (key.backspace || key.delete) setPathInput(value => value.slice(0, -1));
-      else if (!key.ctrl && !key.meta && input) setPathInput(value => value + input);
+    if (view === 'manual-path') {
+      if (key.escape) { setView('library'); setManualPath(''); return; }
+      if (key.return) {
+        const path = manualPath.trim();
+        if (!path) return;
+        void candidateFromAnyPath(profiles, path, runtime)
+          .then(candidate => addCandidate(candidate, catalog.find(entry => entry.profileId === candidate.profile.profile_id)))
+          .catch(error => setMessage(`Could not add model: ${error instanceof Error ? error.message : String(error)}`));
+        return;
+      }
+      if (key.backspace || key.delete) setManualPath(value => value.slice(0, -1));
+      else if (!key.ctrl && !key.meta && input) setManualPath(value => value + input);
       return;
     }
-    if (view === 'generic' && genericInput) {
-      if (key.escape) setGenericInput(undefined);
-      else if (key.return) {
-        try {
-          const patch = genericInputPatch(genericInput.field, genericInput.value);
-          if (updateGenericOverride(patch)) setGenericInput(undefined);
-        } catch (error) {
-          setGenericMessage(error instanceof Error ? error.message : String(error));
+    if (settingsInput) {
+      if (key.escape) { setSettingsInput(undefined); return; }
+      if (key.return) { void saveSettingInput(); return; }
+      if (key.backspace || key.delete) setSettingsInput(current => current ? {...current, value: current.value.slice(0, -1)} : current);
+      else if (!key.ctrl && !key.meta && input) setSettingsInput(current => current ? {...current, value: current.value + input} : current);
+      return;
+    }
+    if (view === 'process') {
+      if (input === 'l') { setShowLogs(value => !value); return; }
+      if (input === 'q' || key.escape) {
+        if (processStatus === 'starting' || processStatus === 'ready' || processStatus === 'stopping') stopChild();
+        else setView('library');
+      }
+      return;
+    }
+    if (view === 'downloading') {
+      if (input === 'q' || input === 'c' || key.escape) {
+        if (!downloadError && downloadProgress?.phase !== 'complete') downloadAbortRef.current?.abort();
+        else setView('library');
+      }
+      return;
+    }
+    if (view === 'download-confirm') {
+      if (key.return) void beginDownload();
+      else if (key.escape || input === 'q') setView('library');
+      return;
+    }
+    if (view === 'settings') {
+      if (key.escape || input === 'q') { setView('library'); return; }
+      if (key.upArrow) setSettingsIndex(value => Math.max(0, value - 1));
+      else if (key.downArrow) setSettingsIndex(value => Math.min(settingsFields.length - 1, value + 1));
+      else if (key.return || input === 'e') {
+        const field = settingsFields[settingsIndex];
+        if (!field) return;
+        if (field === 'auth') {
+          const next: ServerSettings = serverSettings.auth.mode === 'off'
+            ? {...serverSettings, auth: {mode: 'file', key_file: join(homedir(), '.config', 'tess-server', 'api-key')}}
+            : {...serverSettings, auth: {mode: 'off'}};
+          try {
+            const validated = validateServerSettings(next);
+            setServerSettings(validated);
+            void saveServerSettings(validated);
+          } catch (error) { setMessage(error instanceof Error ? error.message : String(error)); }
+        } else {
+          setSettingsInput({field, value: settingValue(serverSettings, field)});
         }
-      } else if (key.backspace || key.delete) setGenericInput(current => current ? {...current, value: current.value.slice(0, -1)} : current);
-      else if (!key.ctrl && !key.meta && input) setGenericInput(current => current ? {...current, value: current.value + input} : current);
+      }
       return;
     }
-    if (view === 'server' && serverInput) {
-      if (key.escape) setServerInput(undefined);
-      else if (key.return) {
-        const value = serverInput.value.trim();
-        try {
-          if (serverInput.field === 'port') setServerDraft(current => validateServerSettings({...current, port: Number(value)}));
-          else if (serverInput.field === 'alias') setServerDraft(current => validateServerSettings({...current, alias: value}));
-          else if (serverInput.field === 'key_file') setServerDraft(current => validateServerSettings({...current, auth: {mode: 'file', key_file: value}}));
-          setServerMessage(undefined); setServerInput(undefined);
-        } catch (error) { setServerMessage(error instanceof Error ? error.message : String(error)); }
-      } else if (key.backspace || key.delete) setServerInput(current => current ? {...current, value: current.value.slice(0, -1)} : current);
-      else if (!key.ctrl && !key.meta && input) setServerInput(current => current ? {...current, value: current.value + input} : current);
-      return;
-    }
-    if (view === 'models') {
-      if (key.upArrow && candidates.length > 0) setSelectedIndex(index => (index - 1 + candidates.length) % candidates.length);
-      else if (key.downArrow && candidates.length > 0) setSelectedIndex(index => (index + 1) % candidates.length);
-      else if (key.return && selected) setView('details');
-      else if (input === 'c') { setServerDraft(serverSettings); setServerMessage(undefined); setView('server'); }
-      else if (input === 'a') setView('add-root');
-      else if (input === 'r') setRefreshToken(value => value + 1);
-      else if (input === 'q' || key.escape) exit();
-      return;
-    }
-    if (view === 'server') {
-      if (key.upArrow) setServerIndex(index => (index - 1 + serverFields.length) % serverFields.length);
-      else if (key.downArrow) setServerIndex(index => (index + 1) % serverFields.length);
-      else if ((key.leftArrow || key.rightArrow) && serverFields[serverIndex] === 'auth') setServerDraft(current => ({...current, auth: current.auth.mode === 'off' ? {mode: 'file', key_file: ''} : {mode: 'off'}}));
-      else if (key.return) {
-        const field = serverFields[serverIndex];
-        if (field === 'port') setServerInput({field, value: String(serverDraft.port)});
-        if (field === 'alias') setServerInput({field, value: serverDraft.alias});
-        if (field === 'key_file') setServerInput({field, value: serverDraft.auth.key_file ?? ''});
-      } else if (input === 's') {
-        void (async () => { try { const validated = validateServerSettings(serverDraft); await saveServerSettings(validated); setServerSettings(validated); setServerMessage('Saved. New launches use this server configuration.'); } catch (error) { setServerMessage(error instanceof Error ? error.message : String(error)); } })();
-      } else if (input === 'r') { const reset = structuredClone(defaultServerSettings); setServerDraft(reset); setServerMessage('Reset to built-in defaults; press s to save.'); }
-      else if (input === 'b' || key.escape) setView('models');
+    if (view === 'advanced') {
+      if (key.escape || input === 'q') { setView('details'); return; }
+      if (key.upArrow) setAdvancedIndex(value => Math.max(0, value - 1));
+      else if (key.downArrow) setAdvancedIndex(value => Math.min(advancedFields.length - 1, value + 1));
+      else if (key.leftArrow) changeAdvanced(-1);
+      else if (key.rightArrow || key.return) changeAdvanced(1);
       return;
     }
     if (view === 'details') {
-      if ((key.leftArrow || key.rightArrow) && selected && resolved) { const values = selected.profile.expert.context_presets.map(preset => preset.tokens); updateOverride({context: cycle(values, resolved.context, key.rightArrow ? 1 : -1)}); }
-      else if (input === 'e' && selected?.kind === 'profiled') { setExpertIndex(0); setView('expert'); }
-      else if (input === 'e' && selected?.kind === 'unprofiled') { setGenericIndex(0); setGenericMessage(undefined); setView('generic'); }
-      else if (input === 'p') setView('preview');
-      else if (input === 's') void beginProcess('serve');
-      else if (input === 'v' && selected?.kind === 'profiled') void beginProcess('verify');
-      else if (input === 'b' || key.escape) setView('models');
-      else if (input === 'q') exit();
+      if (key.escape || input === 'q') { setView('library'); return; }
+      if (input === 'x') { setAdvancedIndex(0); setView('advanced'); return; }
+      if (input === 'd' && selected?.catalog && !selected.candidate) { setView('download-confirm'); return; }
+      if (input === 'r' && selected?.library) {
+        const updated = removeLibraryEntry(library, selected.library.id);
+        void saveModelLibrary(updated).then(() => {
+          setLibrary(updated);
+          setMessage('Removed from My Models. No model files were deleted.');
+          setView('library');
+        });
+        return;
+      }
+      if (key.return && selected?.candidate) void launch();
       return;
     }
-    if (view === 'generic') {
-      if (key.upArrow) setGenericIndex(index => (index - 1 + genericFields.length) % genericFields.length);
-      else if (key.downArrow) setGenericIndex(index => (index + 1) % genericFields.length);
-      else if (key.leftArrow || key.rightArrow) changeGeneric(key.rightArrow ? 1 : -1);
-      else if (key.return) beginGenericInput();
-      else if (input === 'r' && selected) { setModelOverrides(current => ({...current, [selected.profile.profile_id]: {}})); setGenericMessage('Reset to detected defaults.'); }
-      else if (input === 'p') setView('preview');
-      else if (input === 's') void beginProcess('serve');
-      else if (input === 'b' || key.escape) { setGenericInput(undefined); setView('details'); }
+    if (view !== 'library') return;
+    if (input === 'q') { exit(); return; }
+    if (key.tab || key.leftArrow || key.rightArrow) {
+      setRuntime(value => value === 'tess-mlx' ? 'gguf' : 'tess-mlx');
       return;
     }
-    if (view === 'expert') {
-      if (key.upArrow) setExpertIndex(index => (index - 1 + expertFields.length) % expertFields.length);
-      else if (key.downArrow) setExpertIndex(index => (index + 1) % expertFields.length);
-      else if (key.leftArrow || key.rightArrow) changeExpert(key.rightArrow ? 1 : -1);
-      else if (input === 'r' && selected) setModelOverrides(current => ({...current, [selected.profile.profile_id]: {}}));
-      else if (input === 'p') setView('preview');
-      else if (input === 's') void beginProcess('serve');
-      else if (input === 'b' || key.escape) setView('details');
-      return;
-    }
-    if (view === 'preview') { if (input === 's') void beginProcess('serve'); else if (input === 'b' || key.escape) setView(selected?.kind === 'unprofiled' ? 'generic' : 'expert'); return; }
-    if (view === 'process') {
-      const finished = processStatus === 'exited' || processStatus === 'failed';
-      if ((input === 'q' || key.escape) && !finished) stopChild();
-      else if ((key.return || input === 'b' || input === 'q' || key.escape) && finished) { childRef.current = undefined; setView('details'); }
-    }
-  }, {isActive: view !== 'discovering'});
+    if (key.upArrow) setSelectedByRuntime(current => ({...current, [runtime]: Math.max(0, selectedIndex - 1)}));
+    else if (key.downArrow) setSelectedByRuntime(current => ({...current, [runtime]: Math.min(rows.length - 1, selectedIndex + 1)}));
+    else if (key.return) selected?.candidate ? void launch() : setView('details');
+    else if (input === 'i') setView('details');
+    else if (input === 'd' && selected?.catalog && !selected.candidate) setView('download-confirm');
+    else if (input === 'b') void browse();
+    else if (input === 'a') { setManualPath(''); setView('manual-path'); }
+    else if (input === ',') { setSettingsIndex(0); setView('settings'); }
+    else if (input === 'o') setShowOtherMacs(value => !value);
+    else if (input === 'r') setRefreshNonce(value => value + 1);
+  });
 
-  const modelRows = useMemo(() => {
-    const row = (candidate: ModelCandidate, index: number): React.JSX.Element => {
-      const descriptor = candidate.kind === 'profiled' ? candidate.profile.model.quant_label.replace(/ profile build$/i, '') : candidate.profile.model.quant_label;
-      return <Text key={`${candidate.profile.profile_id}:${candidate.modelPath}`} {...(index === selectedIndex ? {color: 'cyan' as const} : {})}>{index === selectedIndex ? '›' : ' '} {candidate.profile.model.name} · {descriptor} · {modelSize(candidate)} · {candidate.kind === 'profiled' ? candidate.complete ? 'ready' : 'incomplete' : candidate.complete ? 'best-effort' : 'incomplete'}</Text>;
-    };
-    return {
-      profiled: candidates.map((candidate, index) => candidate.kind === 'profiled' ? row(candidate, index) : undefined).filter((item): item is React.JSX.Element => Boolean(item)),
-      unprofiled: candidates.map((candidate, index) => candidate.kind === 'unprofiled' ? row(candidate, index) : undefined).filter((item): item is React.JSX.Element => Boolean(item)),
-    };
-  }, [candidates, selectedIndex]);
+  if (view === 'manual-path') {
+    return <Box flexDirection="column">
+      <Brand version={version}/>
+      <Text bold>Add a {runtimeName(runtime)} model</Text>
+      <Text dimColor>{runtime === 'tess-mlx' ? 'Enter the model directory.' : 'Enter a GGUF file, using the first shard for sharded models.'}</Text>
+      <Box borderStyle="round" borderColor="cyan" paddingX={1} marginTop={1}>
+        <Text>{manualPath || ' '}</Text><Text color="cyan">█</Text>
+      </Box>
+      <Text><Key>enter</Key> Add  <Key>esc</Key> Cancel</Text>
+      <Text dimColor>{message}</Text>
+    </Box>;
+  }
 
-  const expertValue = (field: ExpertField): string => {
-    if (!resolved || !selected) return '';
-    if (field === 'context') {
-      const status = resolved.preset.availability === 'qualification-pending' ? ' · Untested' : resolved.preset.experimental ? ' · Experimental' : '';
-      return `${resolved.preset.label}${status}`;
-    }
-    if (field === 'speculation') return resolved.speculation ?? '';
-    if (field === 'draft_depth') return String(resolved.draftDepth ?? '');
-    if (field === 'p_min') return String(resolved.pMin ?? '');
-    if (field === 'reasoning') return resolved.reasoning === 'low' ? 'Low effort' : resolved.reasoning ?? '';
-    if (field === 'preserve_reasoning') return resolved.preserveReasoning ? 'On' : 'Off';
-    if (field === 'kv_quality') return selected.profile.expert.kv_quality?.options.find(option => option.id === resolved.kvQuality)?.label ?? '';
-    return '';
-  };
+  if (view === 'settings') {
+    return <Box flexDirection="column">
+      <Brand version={version}/>
+      <Text bold>Server settings</Text>
+      <Text dimColor>These settings apply to both Tess MLX and GGUF.</Text>
+      <Box flexDirection="column" borderStyle="round" paddingX={1} marginTop={1}>
+        {settingsFields.map((field, index) => <Text key={field} {...(index === settingsIndex ? {color: 'cyan' as const} : {})}>
+          {index === settingsIndex ? '› ' : '  '}{field === 'key_file' ? 'API key file' : field === 'alias' ? 'API model name' : field[0]!.toUpperCase() + field.slice(1)}: {settingValue(serverSettings, field)}
+        </Text>)}
+      </Box>
+      {settingsInput ? <Text><Key>Editing</Key> {settingsInput.value}█</Text> : <Text><Key>↑↓</Key> Select  <Key>enter</Key> Edit / toggle  <Key>esc</Key> Back</Text>}
+      <Text dimColor>Endpoint http://127.0.0.1:{serverSettings.port}/v1 · {message}</Text>
+    </Box>;
+  }
 
-  const genericValue = (field: GenericField): string => {
-    if (!resolved || !selected || selected.kind !== 'unprofiled') return '';
-    if (field === 'context') return resolved.preset.label;
-    if (field === 'batch') return resolved.batch.toLocaleString();
-    if (field === 'ubatch') return resolved.ubatch.toLocaleString();
-    if (field === 'cache_type_k') return resolved.cacheTypeK ?? 'f16';
-    if (field === 'cache_type_v') return resolved.cacheTypeV ?? 'f16';
-    if (field === 'gpu_layers') return resolved.gpuLayers ?? 'all';
-    if (field === 'flash_attention') return resolved.flashAttention ?? 'auto';
-    if (field === 'slots') return String(resolved.slots ?? 1);
-    if (field === 'mmap') return resolved.mmap ? 'On' : 'Off';
-    if (field === 'mlock') return resolved.mlock ? 'On' : 'Off';
-    if (field === 'jinja') return resolved.jinja ? 'On' : 'Off';
-    if (field === 'chat_template') return resolved.chatTemplate || 'Model metadata (auto)';
-    if (field === 'reasoning') return resolved.genericReasoning ?? 'auto';
-    if (field === 'reasoning_format') return resolved.reasoningFormat ?? 'auto';
-    if (field === 'reasoning_budget') return resolved.reasoningBudget === -1 ? 'Unlimited (-1)' : String(resolved.reasoningBudget ?? -1);
-    if (field === 'reasoning_preserve') return resolved.reasoningPreserve ?? 'auto';
-    if (field === 'mmproj') return resolved.mmproj ? `${basename(resolved.mmproj)}${resolved.mmproj === selected.companions?.recommendedMmproj ? ' · detected' : ''}` : 'None';
-    if (field === 'speculation') return resolved.speculationType ?? 'none';
-    if (field === 'draft_model') return resolved.draftModel ? `${basename(resolved.draftModel)}${resolved.draftModel === selected.companions?.recommendedDraft ? ' · detected' : ''}` : 'None / embedded';
-    if (field === 'draft_depth') return String(resolved.draftDepth ?? 3);
-    if (field === 'p_min') return String(resolved.pMin ?? 0);
-    return resolved.rawEngineArgs || 'None';
-  };
+  if (view === 'advanced') {
+    return <Box flexDirection="column">
+      <Brand version={version}/>
+      <Text bold>Advanced · {selected?.title}</Text>
+      <Text dimColor>Recommended defaults are already selected. Change these only when you know the model's limits.</Text>
+      <Box flexDirection="column" borderStyle="round" paddingX={1} marginTop={1}>
+        {advancedFields.map((field, index) => {
+          const value = field === 'context' ? resolved?.context
+            : field === 'batch' ? resolved?.batch
+              : field === 'ubatch' ? resolved?.ubatch
+                : field === 'slots' ? resolved?.slots
+                  : resolved?.flashAttention;
+          return <Text key={field} {...(index === advancedIndex ? {color: 'cyan' as const} : {})}>
+            {index === advancedIndex ? '› ' : '  '}{field.replace('_', ' ')}: {field === 'context' && typeof value === 'number' ? formatTokens(value) : String(value ?? 'default')}
+          </Text>;
+        })}
+      </Box>
+      <Text><Key>↑↓</Key> Select  <Key>←→</Key> Change  <Key>esc</Key> Back</Text>
+      {resolved?.warnings.map(warning => <Text key={warning} color="yellow">Note: {warning}</Text>)}
+    </Box>;
+  }
 
-  return <Box flexDirection="column" paddingX={1}>
-    <Brand version={version} />
-    {view === 'discovering' && <Text color="yellow">Scanning configured model folders…</Text>}
-    {view === 'models' && <Box flexDirection="column">
-      {discoveryError && <Text color="red">{discoveryError}</Text>}
-      {modelRows.profiled.length > 0 && <Box flexDirection="column"><Text bold>Profiled Models</Text>{modelRows.profiled}</Box>}
-      {modelRows.unprofiled.length > 0 && <Box flexDirection="column" marginTop={modelRows.profiled.length > 0 ? 1 : 0}><Text bold>Unprofiled Models</Text>{modelRows.unprofiled}<Text dimColor>Best-effort generic launch · no Tess verification or performance claim</Text></Box>}
-      {candidates.length === 0 && <Text color="yellow">No GGUF models found.</Text>}
-      <Box marginTop={1}><Text>Server  127.0.0.1:{serverSettings.port} · auth {serverSettings.auth.mode === 'file' ? 'bearer' : 'off'} · model {serverSettings.alias}</Text></Box>
-      <Box marginTop={1}><Text><Key>↑/↓</Key> select  <Key>enter</Key> details  <Key>c</Key> configure server  <Key>a</Key> add folder  <Key>r</Key> rescan  <Key>q</Key> quit</Text></Box>
-    </Box>}
-    {view === 'add-root' && <Box flexDirection="column"><Text bold>Add model folder</Text><Text>Path: <Text color="cyan">{pathInput}</Text><Text inverse> </Text></Text><Text dimColor>Enter to scan · Esc to cancel</Text></Box>}
-    {view === 'server' && <Box flexDirection="column"><Text bold color="cyan">Configure Server</Text><Text dimColor>Host is locked to 127.0.0.1 for managed launches.</Text>{serverFields.map((field, index) => <Text key={field} {...(index === serverIndex ? {color: 'cyan' as const} : {})}>{index === serverIndex ? '›' : ' '} {field === 'port' ? `Port              ${serverDraft.port}` : field === 'alias' ? `API model name    ${serverDraft.alias}` : field === 'auth' ? `Authentication    ${serverDraft.auth.mode === 'file' ? 'Bearer · file-backed' : 'Off'}` : `API key file      ${serverDraft.auth.key_file || '(set path)'}`}</Text>)}{serverInput && <Text>Enter {serverInput.field}: <Text color="cyan">{serverInput.value}</Text><Text inverse> </Text></Text>}{serverMessage && <Text color={serverMessage.startsWith('Saved') ? 'green' : 'yellow'}>{serverMessage}</Text>}<Box marginTop={1}><Text><Key>↑/↓</Key> select  <Key>enter</Key> edit  <Key>←/→</Key> toggle  <Key>s</Key> save  <Key>r</Key> reset  <Key>b</Key> back</Text></Box></Box>}
-    {view === 'details' && selected && resolved && (selected.kind === 'profiled' ? <Box flexDirection="column">
-      <Text bold color="cyan">{selected.profile.model.name}  <Text color={runtimeColor(resolved)}>{resolved.runtimeLabel.toUpperCase()}</Text></Text>
-      <Text>{selected.profile.model.quant_label}</Text>
-      <Text>Profile: {selected.profile.profile_id}</Text>
-      <Text>Model: {selected.modelPath}</Text>
-      <Text>Size: {modelSize(selected)} · RAM class: {selected.profile.memory.ram_class_gib} GiB</Text>
-      <Text>Context: <Text color="cyan">{resolved.preset.label}</Text> selected · {formatTokens(selected.profile.context.default)} default · {formatTokens(selected.profile.context.qualified ?? selected.profile.context.validated)} qualified · {formatTokens(selected.profile.context.trained)} trained</Text>
-      {selected.profile.context.validated_prompt && <Text>Evidence: {selected.profile.context.validated_prompt.toLocaleString()}-token prompt{selected.profile.context.validated_generation ? ` + ${selected.profile.context.validated_generation.toLocaleString()} generated` : ''}</Text>}
-      <Text>Managed: batch/ubatch {resolved.batch.toLocaleString()}/{resolved.ubatch.toLocaleString()} · KV {resolved.kvType} · slots {selected.profile.runtime.slots}</Text>
-      <Text>Endpoint: http://127.0.0.1:{serverSettings.port}/v1 · auth {serverSettings.auth.mode === 'file' ? 'bearer' : 'off'}</Text>
-      {resolved.preset.requires_wired_limit_mb && <Box flexDirection="column"><Text color="yellow">Requires GPU wired limit: {resolved.preset.requires_wired_limit_mb.toLocaleString()} MiB</Text><Text>Run once per boot: <Text color="cyan">sudo sysctl iogpu.wired_limit_mb={resolved.preset.requires_wired_limit_mb}</Text></Text><Text dimColor>Tess Server never runs this command or requests root.</Text></Box>}
-      {resolved.rejection && <Text color="red">REJECTED: {resolved.rejection}</Text>}
-      {resolved.deltas.map(delta => <Text key={delta} color="yellow">• {delta}</Text>)}
-      {resolved.warnings.map(warning => <Text key={warning} color="yellow">• {warning}</Text>)}
-      {selected.profile.limitations.slice(0, 2).map(limitation => <Text key={limitation} dimColor>• {limitation}</Text>)}
-      <Box marginTop={1}><Text><Key>←/→</Key> context  <Key>e</Key> expert options  <Key>p</Key> preview  <Key>s</Key> start  <Key>v</Key> verify  <Key>b</Key> back</Text></Box>
-    </Box> : <Box flexDirection="column">
-      <Text bold color="cyan">{selected.profile.model.name}  <Text color="yellow">UNPROFILED</Text></Text>
-      <Text>Generic GGUF · best-effort launch</Text>
-      <Text>Profile: none</Text>
-      <Text>Model: {selected.modelPath}</Text>
-      <Text>Size: {modelSize(selected)} · compatibility and memory class unknown</Text>
-      <Text>Context: <Text color="cyan">{resolved.preset.label}</Text> selected · 4K conservative default · trained limit unknown</Text>
-      <Text>Defaults: batch/ubatch {resolved.batch.toLocaleString()}/{resolved.ubatch.toLocaleString()} · KV {resolved.kvType} · slots {resolved.slots}</Text>
-      <Text>Projector: {genericValue('mmproj')} · Speculation: {resolved.speculationType}</Text>
-      {resolved.speculationType !== 'none' && <Text>Draft/MTP: {genericValue('draft_model')} · depth {resolved.draftDepth} · p_min {resolved.pMin}</Text>}
-      <Text>Endpoint: http://127.0.0.1:{serverSettings.port}/v1 · auth {serverSettings.auth.mode === 'file' ? 'bearer' : 'off'}</Text>
-      {selected.issues.map(issue => <Text key={issue} color="red">• {issue}</Text>)}
-      {resolved.warnings.map(warning => <Text key={warning} color="yellow">• {warning}</Text>)}
-      <Box marginTop={1}><Text><Key>←/→</Key> context  <Key>e</Key> configure  <Key>p</Key> preview  <Key>s</Key> start  <Key>b</Key> back</Text></Box>
-    </Box>)}
-    {view === 'expert' && selected && resolved && <Box flexDirection="column"><Text bold color="cyan">{selected.profile.model.name} · Expert options  <Text color={runtimeColor(resolved)}>{resolved.runtimeLabel.toUpperCase()}</Text></Text>{expertFields.map((field, index) => <Text key={field} {...(index === expertIndex ? {color: 'cyan' as const} : {})}>{index === expertIndex ? '›' : ' '} {field.replaceAll('_', ' ').padEnd(22)} {expertValue(field)}</Text>)}<Text dimColor>Ubatch                  Auto → {resolved.ubatch.toLocaleString()} · locked</Text>{resolved.deltas.length > 0 && <Box flexDirection="column" marginTop={1}><Text bold>Custom deltas</Text>{resolved.deltas.map(delta => <Text key={delta}>• {delta}</Text>)}</Box>}{resolved.warnings.map(warning => <Text key={warning} color="yellow">• {warning}</Text>)}{resolved.rejection && <Text color="red">REJECTED: {resolved.rejection}</Text>}<Box marginTop={1}><Text><Key>↑/↓</Key> select  <Key>←/→</Key> change  <Key>r</Key> reset  <Key>p</Key> preview  <Key>s</Key> start  <Key>b</Key> back</Text></Box></Box>}
-    {view === 'generic' && selected?.kind === 'unprofiled' && resolved && <Box flexDirection="column">
-      <Text bold color="cyan">{selected.profile.model.name} · Generic Model Configuration  <Text color="yellow">UNPROFILED</Text></Text>
-      <Text dimColor>Detected artifacts are defaults. Arrow keys choose presets; Enter edits numeric, path, template, and raw fields.</Text>
-      {genericFields.map((field, index) => <Text key={field} wrap="truncate-end" {...(index === genericIndex ? {color: 'cyan' as const} : {})}>{index === genericIndex ? '›' : ' '} {genericLabel(field).padEnd(22)} {genericValue(field)}</Text>)}
-      {genericInput && <Text>Edit {genericLabel(genericInput.field)}: <Text color="cyan">{genericInput.value}</Text><Text inverse> </Text></Text>}
-      {genericMessage && <Text color="yellow">{genericMessage}</Text>}
-      <Text dimColor>Loopback host, port/auth ownership, and disabled web/agent surfaces remain enforced.</Text>
-      <Box marginTop={1}><Text><Key>↑/↓</Key> select  <Key>←/→</Key> preset  <Key>enter</Key> edit  <Key>r</Key> defaults  <Key>p</Key> preview  <Key>s</Key> start  <Key>b</Key> back</Text></Box>
-    </Box>}
-    {view === 'preview' && selected && resolved && <Box flexDirection="column">
-      <Text bold>Effective configuration · <Text color={runtimeColor(resolved)}>{resolved.runtimeLabel.toUpperCase()}</Text></Text>
-      {selected.kind === 'profiled' ? <Text>Profile: {selected.profile.profile_id}</Text> : <Text>Mode: Generic GGUF · no Tess verification claim</Text>}
-      <Text>Context: {resolved.context.toLocaleString()} · batch/ubatch {resolved.batch}/{resolved.ubatch} · KV {resolved.kvType}</Text>
-      {selected.kind === 'unprofiled' && <Text>GPU layers: {resolved.gpuLayers} · FA {resolved.flashAttention} · slots {resolved.slots} · mmap {resolved.mmap ? 'on' : 'off'} · mlock {resolved.mlock ? 'on' : 'off'}</Text>}
-      {selected.kind === 'unprofiled' && <Text>Jinja: {resolved.jinja ? 'on' : 'off'} · template {resolved.chatTemplate || 'auto'} · reasoning {resolved.genericReasoning}/{resolved.reasoningFormat} · budget {resolved.reasoningBudget}</Text>}
-      {selected.kind === 'unprofiled' && <Text>Projector: {resolved.mmproj ? basename(resolved.mmproj) : 'none'} · speculation {resolved.speculationType} · draft {resolved.draftModel ? basename(resolved.draftModel) : 'none/embedded'}</Text>}
-      {resolved.speculation && <Text>Speculation: {resolved.speculation}{resolved.speculation === 'dspark' ? ` · depth ${resolved.draftDepth} · p_min ${resolved.pMin}` : ''}</Text>}
-      {resolved.reasoning && <Text>Reasoning: {resolved.reasoning} · preserve {resolved.preserveReasoning ? 'on' : 'off'}</Text>}
-      <Text>Endpoint: http://127.0.0.1:{serverSettings.port}/v1 · model {serverSettings.alias} · auth {serverSettings.auth.mode === 'file' ? 'bearer' : 'off'}</Text>
-      {selected.kind === 'unprofiled' && <Box flexDirection="column" marginTop={1}><Text bold>Effective engine command</Text><Text wrap="wrap">{genericCommand}</Text></Box>}
-      {resolved.deltas.map(delta => <Text key={delta}>Delta: {delta}</Text>)}
-      {resolved.warnings.map(warning => <Text key={warning} color="yellow">• {warning}</Text>)}
-      {resolved.rejection && <Text color="red">Start blocked: {resolved.rejection}</Text>}
-      <Box marginTop={1}><Text><Key>s</Key> start  <Key>b</Key> back</Text></Box>
-    </Box>}
-    {view === 'process' && <Box flexDirection="column"><Text bold>{processMode === 'serve' ? 'Server' : 'Verification'} · {runningLabel.toUpperCase()} · <Text color={processStatus === 'failed' ? 'red' : processStatus === 'ready' ? 'green' : 'yellow'}>{processStatus}</Text></Text>{processMode === 'serve' && <Text>Health: {health} · http://127.0.0.1:{serverSettings.port}/v1 · auth {serverSettings.auth.mode === 'file' ? 'bearer' : 'off'}</Text>}{processExit && <Text {...(processStatus === 'failed' ? {color: 'red' as const} : {})}>{processExit}</Text>}<Box flexDirection="column" borderStyle="round" borderColor="gray" paddingX={1} marginTop={1}>{logs.length > 0 ? logs.map((line, index) => <Text key={`${index}:${line}`} wrap="truncate-end">{line}</Text>) : <Text dimColor>Waiting for output…</Text>}</Box><Box marginTop={1}><Text>{processStatus === 'exited' || processStatus === 'failed' ? <><Key>enter</Key> back</> : <><Key>q</Key> stop</>}</Text></Box></Box>}
+  if (view === 'details') {
+    return <Box flexDirection="column">
+      <Brand version={version}/>
+      <Box justifyContent="space-between">
+        <Text bold>{selected?.title ?? 'Model details'}</Text>
+        {selected && <Text color={runtimeColor(selected.runtime)}>{runtimeName(selected.runtime)}</Text>}
+      </Box>
+      {selected && <Box flexDirection="column" borderStyle="round" paddingX={1} marginTop={1}>
+        <Text color={statusColor(selected.status)} bold>{selected.status}</Text>
+        <Text>{selected.description}</Text>
+        {selected.candidate && <Text>Model size: {formatBytes(modelBytes(selected.candidate))}</Text>}
+        {selected.candidate && <Text>Context: {formatTokens(resolved?.context ?? selected.candidate.profile.context.default)}</Text>}
+        {selected.catalog && <Text>Source: {selected.catalog.repository} @ {selected.catalog.revision}</Text>}
+        {selected.catalog && <Text>License: {selected.catalog.licenseName} · {selected.catalog.licenseUrl}</Text>}
+        {selected.catalog && <Text>Capabilities: {selected.catalog.capabilities.join(' · ')}</Text>}
+        {selected.candidate?.issues.map(issue => <Text key={issue} color="red">Needs attention: {issue}</Text>)}
+        {resolved?.rejection && <Text color="red">Needs attention: {resolved.rejection}</Text>}
+      </Box>}
+      <Text>
+        {selected?.candidate ? <><Key>enter</Key> Launch  <Key>x</Key> Advanced  </> : selected?.catalog?.downloadEnabled ? <><Key>d</Key> Download  </> : null}
+        {selected?.library && <><Key>r</Key> Remove from library  </>}<Key>esc</Key> Back
+      </Text>
+      {selected?.catalog?.downloadUnavailableReason && <Text color="yellow">{selected.catalog.downloadUnavailableReason}</Text>}
+    </Box>;
+  }
+
+  if (view === 'download-confirm') {
+    return <Box flexDirection="column">
+      <Brand version={version}/>
+      <Text bold>Download {selected?.title}</Text>
+      {selected?.catalog && <Box flexDirection="column" borderStyle="round" borderColor="yellow" paddingX={1} marginTop={1}>
+        <Text>Repository: {selected.catalog.repository}</Text>
+        <Text>Revision: {selected.catalog.revision}</Text>
+        <Text>Download: {formatBytes(selected.catalog.diskBytes)}</Text>
+        <Text>License: {selected.catalog.licenseName}</Text>
+        <Text>Destination: Tess Server Models/{selected.catalog.destinationSlug}</Text>
+        <Text dimColor>Network access starts only after you confirm. Transfers resume safely and finish atomically.</Text>
+      </Box>}
+      <Text><Key>enter</Key> Confirm download  <Key>esc</Key> Cancel</Text>
+    </Box>;
+  }
+
+  if (view === 'downloading') {
+    const percent = progressPercent(downloadProgress);
+    return <Box flexDirection="column">
+      <Brand version={version}/>
+      <Text bold>Downloading {selected?.title}</Text>
+      <Box borderStyle="round" borderColor={downloadError ? 'red' : 'cyan'} flexDirection="column" paddingX={1} marginTop={1}>
+        <Text color={downloadError ? 'red' : 'cyan'}>{downloadError ?? downloadProgress?.phase ?? 'Preparing'}</Text>
+        <Text color="cyan">{bar(percent)} {percent === undefined ? '' : `${percent}%`}</Text>
+        {downloadProgress?.file && <Text>{downloadProgress.file} · {formatBytes(downloadProgress.fileCompletedBytes ?? 0)} / {formatBytes(downloadProgress.fileTotalBytes ?? 0)}</Text>}
+        {downloadProgress && <Text>{formatBytes(downloadProgress.completedBytes)} / {formatBytes(downloadProgress.totalBytes)}</Text>}
+      </Box>
+      <Text><Key>{downloadError ? 'q' : 'c'}</Key> {downloadError ? 'Back' : 'Pause and keep partial download'}</Text>
+    </Box>;
+  }
+
+  if (view === 'process') {
+    const percent = progressPercent(startupProgress);
+    return <Box flexDirection="column">
+      <Brand version={version}/>
+      <Box justifyContent="space-between">
+        <Text bold>{selected?.title}</Text>
+        <Text color={processStatus === 'ready' ? 'green' : processStatus === 'failed' ? 'red' : 'yellow'}>{processStatus.toUpperCase()}</Text>
+      </Box>
+      <Box borderStyle="round" borderColor={processStatus === 'ready' ? 'green' : processStatus === 'failed' ? 'red' : runtimeColor(selected?.runtime ?? runtime)} flexDirection="column" paddingX={1} marginTop={1}>
+        <Text bold>{phaseTitle(startupProgress)}</Text>
+        <Text color="cyan">{bar(percent)} {percent === undefined ? '' : `${percent}%`}</Text>
+        <Text>{progressLabel(startupProgress, clock)}</Text>
+        <Text dimColor>Elapsed {Math.floor((startupProgress?.elapsedMs ?? clock - processStartedAtRef.current) / 1000)}s · model footprint {selected?.candidate ? formatBytes(modelBytes(selected.candidate)) : 'unknown'}</Text>
+        {capabilities && <Text>Context {formatTokens(capabilities.contextWindow)} · output budget {formatTokens(capabilities.maxOutputTokens)} · {capabilities.slots} slot{capabilities.slots === 1 ? '' : 's'}</Text>}
+        {processExit && <Text {...(processStatus === 'failed' ? {color: 'red' as const} : {})}>{processExit}</Text>}
+      </Box>
+      {showLogs && <Box flexDirection="column" borderStyle="round" paddingX={1}>
+        <Text bold dimColor>Logs</Text>
+        {logs.slice(-12).map((line, index) => <Text key={`${index}:${line}`} wrap="truncate">{line}</Text>)}
+      </Box>}
+      <Text><Key>l</Key> {showLogs ? 'Hide logs' : 'Show logs'}  <Key>q</Key> {processStatus === 'starting' || processStatus === 'ready' ? 'Stop' : 'Back'}</Text>
+    </Box>;
+  }
+
+  let lastSection: ModelRow['section'] | undefined;
+  return <Box flexDirection="column">
+    <Brand version={version}/>
+    <Box justifyContent="space-between">
+      <Box>
+        <Text {...(runtime === 'tess-mlx' ? {color: 'magenta' as const} : {})} bold={runtime === 'tess-mlx'}>[ Tess MLX ]</Text>
+        <Text>  </Text>
+        <Text {...(runtime === 'gguf' ? {color: 'cyan' as const} : {})} bold={runtime === 'gguf'}>[ GGUF ]</Text>
+      </Box>
+      <Text dimColor>Server stopped · {Math.round(totalmem() / 1024 ** 3)} GiB Mac</Text>
+    </Box>
+    <Box flexDirection="column" borderStyle="round" borderColor={runtimeColor(runtime)} paddingX={1} marginTop={1}>
+      {rows.length === 0 && <Text dimColor>No {runtimeName(runtime)} models to show.</Text>}
+      {rows.map((row, index) => {
+        const heading = row.section !== lastSection;
+        lastSection = row.section;
+        return <React.Fragment key={row.id}>
+          {heading && <Text bold {...(row.section === 'Recommended' ? {color: 'yellow' as const} : {})}>{row.section}</Text>}
+          <Box>
+            <Text {...(index === selectedIndex ? {color: runtimeColor(runtime)} : {})} bold={index === selectedIndex}>{index === selectedIndex ? '› ' : '  '}</Text>
+            <Box width={34}><Text bold={index === selectedIndex} wrap="truncate">{row.title}</Text></Box>
+            <Box width={12}><Text color={runtimeColor(runtime)}>{runtimeName(runtime)}</Text></Box>
+            <Box width={13}><Text>{row.candidate ? formatBytes(modelBytes(row.candidate)) : row.catalog ? formatBytes(row.catalog.diskBytes) : '—'}</Text></Box>
+            <Text color={statusColor(row.status)}>{row.status}</Text>
+          </Box>
+        </React.Fragment>;
+      })}
+    </Box>
+    <Text dimColor>{scanning ? 'Scanning local model folders… ' : ''}{message}</Text>
+    <Text>
+      <Key>tab/←→</Key> Runtime  <Key>↑↓</Key> Select  <Key>enter</Key> {selected?.candidate ? 'Launch' : 'Details'}  <Key>i</Key> Info
+    </Text>
+    <Text>
+      {selected?.catalog?.downloadEnabled && !selected.candidate && <><Key>d</Key> Download  </>}<Key>b</Key> Browse  <Key>a</Key> Add path  <Key>,</Key> Settings  <Key>r</Key> Rescan  <Key>o</Key> {showOtherMacs ? 'Fit this Mac' : 'Other Macs'}  <Key>q</Key> Quit
+    </Text>
+    <Text dimColor>Catalog is bundled and offline · host catalog filter {hostMemoryGiB().toFixed(0)} GiB</Text>
   </Box>;
 }

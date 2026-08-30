@@ -41,7 +41,7 @@ export async function verifySidecar(root = process.env.TESS_NPM_SIDECAR_ROOT || 
     'bin/upstream/tess-server', 'bin/upstream/default.metallib',
     'bin/mlx/tess-mlx-server', 'bin/mlx/libmlx.dylib',
     'bin/mlx/libjaccl.dylib', 'bin/mlx/mlx.metallib',
-    'profiles', 'scripts/verify-profile.sh',
+    'profiles', 'scripts/inspect-model.sh', 'scripts/verify-profile.sh', 'scripts/verify-payload.sh',
     'share/tess-server/manifest.json',
     'share/tess-server/mlx/model-profile.json',
     'share/tess-server/mlx/tess-mlx-manifest.json',

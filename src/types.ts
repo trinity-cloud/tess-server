@@ -12,6 +12,8 @@ export interface ProfileModel {
   format?: 'gguf' | 'mlx';
 }
 
+export type RuntimeKind = 'tess-mlx' | 'gguf';
+
 export interface ProfileShard {
   name: string;
   bytes: number;
@@ -134,6 +136,92 @@ export interface ModelCandidate {
   };
   complete: boolean;
   issues: string[];
+}
+
+export interface CatalogArtifact {
+  name: string;
+  bytes: number;
+  sourcePath: string;
+}
+
+export interface CatalogEntry {
+  id: string;
+  profileId: string;
+  runtime: RuntimeKind;
+  displayName: string;
+  description: string;
+  repository: string;
+  revision: string;
+  licenseName: string;
+  licenseUrl: string;
+  memoryClassGiB: number;
+  diskBytes: number;
+  destinationSlug: string;
+  featured: boolean;
+  downloadEnabled: boolean;
+  downloadUnavailableReason?: string;
+  artifacts: CatalogArtifact[];
+  capabilities: string[];
+}
+
+export interface LocalModelEntry {
+  id: string;
+  runtime: RuntimeKind;
+  catalogId?: string;
+  profileId?: string;
+  displayName: string;
+  path: string;
+  artifactNames: string[];
+  artifactBytes: number[];
+  lastInspectedAt: string;
+  lastKnownReady: boolean;
+  favorite: boolean;
+  provenance?: {
+    repository: string;
+    revision: string;
+    completedAt: string;
+  };
+}
+
+export interface ModelLibrary {
+  schemaVersion: 1;
+  entries: LocalModelEntry[];
+}
+
+export type StartupPhase =
+  | 'inspecting_model'
+  | 'opening_weights'
+  | 'loading_weights'
+  | 'preparing_runtime'
+  | 'starting_api'
+  | 'ready';
+
+export interface StartupProgress {
+  schemaVersion: 1;
+  sequence: number;
+  phase: StartupPhase;
+  elapsedMs: number;
+  message: string;
+  completed?: number;
+  total?: number;
+  current?: string;
+  receivedAt: number;
+}
+
+export interface RuntimeCapabilities {
+  schemaVersion: 1;
+  runtime: RuntimeKind;
+  model: string;
+  contextWindow: number;
+  maxOutputTokens: number;
+  slots: number;
+  speculation: string;
+  features: {
+    chatCompletions: boolean;
+    streaming: boolean;
+    tools: boolean;
+    reasoning: boolean;
+  };
 }
 
 export type GenericKvType = 'f32' | 'f16' | 'bf16' | 'q8_0' | 'q4_0' | 'q4_1' | 'iq4_nl' | 'q5_0' | 'q5_1';

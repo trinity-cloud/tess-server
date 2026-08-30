@@ -1,25 +1,7 @@
 #!/bin/bash
-# Verify the ordered model/draft artifacts for a Tess profile without loading
-# the model or starting the server.
+# Deprecated compatibility wrapper. Inspection validates structure and sizes;
+# it intentionally performs no model-content hashing.
 set -euo pipefail
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-. "$SCRIPT_DIR/profile-common.sh"
-
-if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
-  echo "usage: $0 <profile-id> <first-model-shard> [first-draft-shard]" >&2
-  exit 2
-fi
-
-PROFILE_ID=$1
-MODEL_PATH=$2
-DRAFT_PATH=${3:-}
-
-if [ "$(tess_profile_engine_variant "$PROFILE_ID")" = tess-mlx ]; then
-  tess_profile_begin_mlx "$PROFILE_ID"
-else
-  tess_profile_begin "$PROFILE_ID"
-fi
-tess_verify_profile_files "$MODEL_PATH" "$DRAFT_PATH"
-tess_log_runtime_label
-printf 'profile verification passed: %s (%s)\n' "$TESS_PROFILE_ID" "$TESS_RUNTIME_LABEL"
+exec "$SCRIPT_DIR/inspect-model.sh" "$@"

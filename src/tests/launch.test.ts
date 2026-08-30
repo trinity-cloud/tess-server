@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {serveSpec, verifySpec} from '../launch.js';
+import {inspectSpec, serveSpec} from '../launch.js';
 import type {ModelCandidate, ProfileDescriptor} from '../types.js';
 
 const profile = {
@@ -20,9 +20,9 @@ test('builds a packaged verified launcher spec', () => {
   assert.equal(spec.env.REASONING, 'low');
 });
 
-test('builds a profile verifier spec', () => {
-  const spec = verifySpec('/payload', candidate);
-  assert.deepEqual(spec.args, ['/payload/scripts/verify-profile.sh', 'qwen36-a3b-q8-q4mtp', candidate.modelPath]);
+test('builds a structural profile inspector spec', () => {
+  const spec = inspectSpec('/payload', candidate);
+  assert.deepEqual(spec.args, ['/payload/scripts/inspect-model.sh', 'qwen36-a3b-q8-q4mtp', candidate.modelPath]);
 });
 
 test('passes an exact companion to profiled DFlash launchers', () => {
@@ -34,7 +34,7 @@ test('passes an exact companion to profiled DFlash launchers', () => {
   assert.deepEqual(spec.args, ['/payload/scripts/serve/serve-laguna.sh']);
   assert.equal(spec.env.DRAFT_MODEL, laguna.draftPath);
   assert.equal(spec.env.DSPARK, laguna.draftPath);
-  assert.deepEqual(verifySpec('/payload', laguna).args, ['/payload/scripts/verify-profile.sh', 'laguna-s21-q4km-dflash', laguna.modelPath, laguna.draftPath]);
+  assert.deepEqual(inspectSpec('/payload', laguna).args, ['/payload/scripts/inspect-model.sh', 'laguna-s21-q4km-dflash', laguna.modelPath, laguna.draftPath]);
 });
 
 test('maps every GGUF profile to its packaged launcher', () => {
@@ -116,5 +116,5 @@ test('builds a configurable generic GGUF launcher with detected companions', () 
   assert.equal(valueFor('--spec-draft-n-max'), '3');
   assert.equal(valueFor('--spec-draft-p-min'), '0');
   assert.deepEqual(spec.args.slice(-8), ['--alias', 'local-model', '--host', '127.0.0.1', '--port', '9000', '--api-key-file', '/keys/local.key']);
-  assert.throws(() => verifySpec('/payload', generic), /do not have a Tess verification manifest/);
+  assert.throws(() => inspectSpec('/payload', generic), /inspected directly during discovery/);
 });

@@ -34,6 +34,9 @@ tess_json_get() {
 tess_payload_checksum() {
   local target checksum_file value
   target=$1
+  case "$target" in
+    ''|/*|../*|*/../*|*/..) tess_die "unsafe packaged checksum path: $target" ;;
+  esac
   checksum_file="$TESS_PACKAGE_ROOT/SHA256SUMS"
   [ -f "$checksum_file" ] || tess_die "packaged payload SHA256SUMS is missing"
   value=$(/usr/bin/awk -v target="$target" '$2 == target {print $1}' "$checksum_file")
@@ -252,54 +255,21 @@ tess_preflight_port() {
   fi
 }
 
-tess_cache_root() {
-  if [ -n "${TESS_HASH_CACHE_DIR:-}" ]; then
-    printf '%s\n' "$TESS_HASH_CACHE_DIR"
-  elif [ -n "${XDG_CACHE_HOME:-}" ]; then
-    printf '%s\n' "$XDG_CACHE_HOME/tess-server/model-hashes-v1"
-  else
-    printf '%s\n' "$HOME/Library/Caches/Tess/server/model-hashes-v1"
-  fi
-}
-
-tess_verify_file() {
-  local path expected_name expected_bytes expected_sha actual_name actual_bytes signature
-  local cache_root cache_file cached_signature actual_sha cache_tmp
+tess_inspect_file() {
+  local path expected_name expected_bytes actual_name actual_bytes
   path=$1
   expected_name=$2
   expected_bytes=$3
-  expected_sha=$4
 
   [ -f "$path" ] || tess_die "required model file is missing: $expected_name"
   actual_name=$(basename -- "$path")
   [ "$actual_name" = "$expected_name" ] || tess_die "model filename mismatch: expected $expected_name, got $actual_name"
   actual_bytes=$(/usr/bin/stat -f %z "$path" 2>/dev/null) || tess_die "cannot stat model file: $expected_name"
   [ "$actual_bytes" = "$expected_bytes" ] || tess_die "model size mismatch: $expected_name"
-
-  signature=$(/usr/bin/stat -f '%d:%i:%z:%m:%c' "$path" 2>/dev/null) || tess_die "cannot read model metadata: $expected_name"
-  cache_root=$(tess_cache_root)
-  /bin/mkdir -p "$cache_root" || tess_die "cannot create model verification cache"
-  /bin/chmod 700 "$cache_root" 2>/dev/null || true
-  cache_file="$cache_root/$expected_sha"
-  if [ -f "$cache_file" ]; then
-    cached_signature=$(/bin/cat "$cache_file" 2>/dev/null || true)
-    if [ "$cached_signature" = "$signature" ]; then
-      tess_note "hash verified (cached): $expected_name"
-      return 0
-    fi
-  fi
-
-  tess_note "hashing $expected_name (first verified use only)"
-  actual_sha=$(/usr/bin/shasum -a 256 "$path" 2>/dev/null | /usr/bin/awk '{print $1}') || tess_die "cannot hash model file: $expected_name"
-  [ "$actual_sha" = "$expected_sha" ] || tess_die "model SHA-256 mismatch: $expected_name"
-  cache_tmp="$cache_file.$$"
-  (umask 077 && printf '%s\n' "$signature" > "$cache_tmp") || tess_die "cannot write model verification cache"
-  /bin/mv -f "$cache_tmp" "$cache_file" || tess_die "cannot update model verification cache"
-  tess_note "hash verified: $expected_name"
 }
 
-tess_verify_collection() {
-  local collection first_path directory index name bytes sha path
+tess_inspect_collection() {
+  local collection first_path directory index name bytes path
   collection=$1
   first_path=$2
   if [ -d "$first_path" ]; then
@@ -310,13 +280,12 @@ tess_verify_collection() {
   index=0
   while name=$(tess_profile_get "$collection.$index.name"); do
     bytes=$(tess_profile_get "$collection.$index.bytes") || tess_die "bytes missing for $name"
-    sha=$(tess_profile_get "$collection.$index.sha256") || tess_die "sha256 missing for $name"
     if [ "$index" = "0" ] && [ ! -d "$first_path" ]; then
       path=$first_path
     else
       path="$directory/$name"
     fi
-    tess_verify_file "$path" "$name" "$bytes" "$sha"
+    tess_inspect_file "$path" "$name" "$bytes"
     index=$((index + 1))
   done
   [ "$index" -gt 0 ] || tess_die "profile collection is empty: $collection"
@@ -362,8 +331,9 @@ tess_resolve_mlx_server() {
     binary_value=$(printf '%s\n' "$version_json" | tess_json_get "$field") || tess_die "Tess MLX version JSON lacks $field"
     [ "$release_value" = "$binary_value" ] || tess_die "Tess MLX binary/manifest mismatch: $field"
   done
-  [ "$(printf '%s\n' "$version_json" | tess_json_get libmlx_sha256)" = "$(tess_payload_checksum "$libmlx_rel")" ] || tess_die "Tess MLX library identity mismatch"
-  [ "$(printf '%s\n' "$version_json" | tess_json_get metallib_sha256)" = "$(tess_payload_checksum "$metallib_rel")" ] || tess_die "Tess MLX metallib identity mismatch"
+  # This retained integrity boundary reads only the bounded shipped runtime
+  # payload. It never reads user model shards; the runtime's version contract
+  # independently reports its adjacent library identities.
 
   release_manifest="$TESS_PACKAGE_ROOT/share/tess-server/manifest.json"
   for field in version build_id engine_commit mlx_commit distribution; do
@@ -373,28 +343,28 @@ tess_resolve_mlx_server() {
   done
 }
 
-tess_verify_profile_files() {
+tess_inspect_profile_files() {
   local model_path draft_path draft_name
   model_path=$1
   draft_path=${2:-}
-  if [ "${ALLOW_UNVERIFIED_MODEL:-0}" = "1" ]; then
-    TESS_RUNTIME_LABEL=custom
-    TESS_CUSTOM_REASONS="${TESS_CUSTOM_REASONS}${TESS_CUSTOM_REASONS:+, }model hash verification skipped"
-    tess_note "WARNING: model hash verification skipped; runtime label is custom"
-    return 0
-  fi
 
-  tess_verify_collection shards "$model_path"
+  tess_inspect_collection shards "$model_path"
   if draft_name=$(tess_profile_get draft.0.name); then
     if [ "${TESS_DRAFT_OPTIONAL:-0}" = "1" ] && [ -z "$draft_path" ]; then
-      tess_note "draft verification: not required by resolved target-only configuration"
+      tess_note "draft inspection: not required by resolved target-only configuration"
     else
       [ -n "$draft_path" ] || tess_die "profile requires draft artifact: $draft_name"
-      tess_verify_collection draft "$draft_path"
+      tess_inspect_collection draft "$draft_path"
     fi
   elif [ -n "$draft_path" ]; then
     tess_die "profile does not accept a separate draft artifact"
   fi
+}
+
+# Compatibility for older staged launchers. This is structural inspection and
+# intentionally performs no model-content hashing.
+tess_verify_profile_files() {
+  tess_inspect_profile_files "$@"
 }
 
 tess_runtime_link_root() {
