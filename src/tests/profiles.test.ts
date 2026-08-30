@@ -3,13 +3,14 @@ import test from 'node:test';
 import {packageRoot, resolveProfileRoot} from '../paths.js';
 import {launcherForProfile, loadProfiles} from '../profiles.js';
 
-test('loads all ten source profiles with launcher mappings', async () => {
+test('loads all eleven source profiles with launcher mappings', async () => {
   const root = await resolveProfileRoot(packageRoot);
   const profiles = await loadProfiles(root);
-  assert.equal(profiles.length, 10);
+  assert.equal(profiles.length, 11);
   assert.deepEqual(new Set(profiles.map(profile => profile.profile_id)), new Set([
     'dsv4-dspark',
     'dsv4-0731-dspark',
+    'dsv4-0731-mlx-24mixed',
     'hy3-iq2m',
     'inkling-small-iq3xxs',
     'laguna-s21-q4km-dflash',
@@ -22,7 +23,7 @@ test('loads all ten source profiles with launcher mappings', async () => {
   for (const profile of profiles) {
     assert.match(launcherForProfile(profile.profile_id), /^serve-.+\.sh$/);
     assert.equal(profile.schema_version, 2);
-    assert.equal(profile.engine.min_version, '0.1.5');
+    assert.equal(profile.engine.min_version, '0.1.6');
     assert.ok(profile.expert.context_presets.some(preset => preset.tokens === profile.context.default));
   }
   const laguna = profiles.find(profile => profile.profile_id === 'laguna-s21-q4km-dflash');
@@ -71,4 +72,12 @@ test('loads all ten source profiles with launcher mappings', async () => {
   assert.equal(dsv40731?.expert.speculation?.options.includes('off'), true);
   assert.equal(dsv40731?.expert.context_presets.find(preset => preset.tokens === 16384)?.speculation_qualification, 'accepted-unverified');
   assert.equal(dsv40731?.expert.context_presets.find(preset => preset.tokens === 262144)?.availability, undefined);
+
+  const dsv4Mlx = profiles.find(profile => profile.profile_id === 'dsv4-0731-mlx-24mixed');
+  assert.equal(dsv4Mlx?.model.format, 'mlx');
+  assert.equal(dsv4Mlx?.shards.length, 23);
+  assert.equal(dsv4Mlx?.draft, null);
+  assert.equal(dsv4Mlx?.context.qualified, 32768);
+  assert.equal(dsv4Mlx?.speculation, null);
+  assert.equal(dsv4Mlx?.expert.speculation, undefined);
 });

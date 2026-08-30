@@ -2,7 +2,7 @@
 
 ## Install
 
-Tess Server requires an Apple Silicon Mac, macOS 15 or newer, and Node.js 22 or newer.
+Tess Server requires an Apple Silicon Mac and Node.js 22 or newer. GGUF profiles require macOS 15 or newer; Tess MLX currently requires macOS 26.2 or newer.
 
 ```bash
 npm install -g @trinity-cloud/tess-server
@@ -10,7 +10,7 @@ tess-server doctor
 tess-server
 ```
 
-`doctor` verifies that the installed package and bundled engine payload are usable on the current machine. No Homebrew, Python, OpenSSL installation, Apple Developer membership, or separate engine installation is required.
+`doctor` verifies that the installed package and bundled engine payloads are usable on the current machine. No Homebrew, system Python, OpenSSL installation, Apple Developer membership, or separate engine installation is required.
 
 Model weights are not included and are never downloaded by Tess Server.
 
@@ -25,6 +25,8 @@ tess-server --model-root /Volumes/Models --model-root /path/to/another/folder
 Press `r` to rescan. Results are separated into **Profiled Models** and
 **Unprofiled Models**. Select a complete entry and press `enter` to open its
 details. Unprofiled entries are best-effort and never receive a `VERIFIED` label.
+
+Qualified MLX checkpoints are discovered by their `model.safetensors.index.json` file and shown as one model-directory entry. MLX launches execute the bundled Tess MLX server and adjacent checksum-bound libraries directly from the installed sidecar; they do not use the network, extract a runtime, or invoke a system Python installation.
 
 ## Choose a context
 
@@ -110,8 +112,8 @@ Useful local endpoints include `/health`, `/v1/models`, `/v1/chat/completions`, 
 tess-server profiles
 tess-server profiles --json
 tess-server models --model-root /Volumes/Models
-tess-server verify --profile PROFILE_ID --model /path/to/model.gguf
-tess-server serve --profile PROFILE_ID --model /path/to/model.gguf --context 32768 --port 8787
+tess-server verify --profile PROFILE_ID --model /path/to/model-or-mlx-directory
+tess-server serve --profile PROFILE_ID --model /path/to/model-or-mlx-directory --context 32768 --port 8787
 tess-server doctor
 tess-server doctor --json
 tess-server engine -- --help

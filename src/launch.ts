@@ -5,6 +5,8 @@ import {launcherForProfile} from './profiles.js';
 import type {LaunchOverrides, ModelCandidate, ProcessSpec, ProfileDescriptor} from './types.js';
 
 function launchEnvironment(payloadRoot: string, candidate: ModelCandidate, overrides: LaunchOverrides): NodeJS.ProcessEnv {
+  const isMlxProfile = candidate.profile.model?.format === 'mlx' || candidate.profile.profile_id === 'dsv4-0731-mlx-24mixed';
+  const supportsProfileSpeculation = !isMlxProfile;
   return {
     ...process.env,
     TESS_PACKAGE_ROOT: payloadRoot,
@@ -14,9 +16,9 @@ function launchEnvironment(payloadRoot: string, candidate: ModelCandidate, overr
     ...(overrides.port ? {PORT: String(overrides.port)} : {}),
     ...(overrides.alias ? {ALIAS: overrides.alias} : {}),
     ...(overrides.apiKeyFile ? {API_KEY_FILE: overrides.apiKeyFile} : {}),
-    ...(overrides.speculation ? {DRAFT: overrides.speculation === 'dspark' ? '1' : '0'} : {}),
-    ...(overrides.draftDepth !== undefined ? {DMAX: String(overrides.draftDepth)} : {}),
-    ...(overrides.pMin !== undefined ? {PMIN: String(overrides.pMin)} : {}),
+    ...(supportsProfileSpeculation && overrides.speculation ? {DRAFT: overrides.speculation === 'dspark' ? '1' : '0'} : {}),
+    ...(supportsProfileSpeculation && overrides.draftDepth !== undefined ? {DMAX: String(overrides.draftDepth)} : {}),
+    ...(supportsProfileSpeculation && overrides.pMin !== undefined ? {PMIN: String(overrides.pMin)} : {}),
     ...(overrides.reasoning ? {REASONING: overrides.reasoning} : {}),
     ...(overrides.preserveReasoning !== undefined ? {PRESERVE_REASONING: overrides.preserveReasoning ? '1' : '0'} : {}),
     ...(overrides.kvQuality ? {KV_QUALITY: overrides.kvQuality} : {}),

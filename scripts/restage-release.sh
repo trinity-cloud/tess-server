@@ -1,6 +1,7 @@
 #!/bin/bash
 # Restage public metadata around an already checksummed internal release payload.
 # The proprietary executable and metallib are copied byte-for-byte and revalidated.
+# TESS_MLX_ARCHIVE must name the separately qualified Tess MLX archive.
 # Usage: restage-release.sh <release.tar.gz> <version> <build-id>
 set -euo pipefail
 
@@ -29,7 +30,8 @@ WORK=$(mktemp -d /tmp/tess-metadata-restage.XXXXXX)
 trap 'rm -rf "$WORK"' EXIT
 EXTRACT="$WORK/extract"
 BUILD="$WORK/build"
-mkdir -p "$EXTRACT" "$BUILD/bin"
+UPSTREAM_BUILD="$WORK/upstream-build"
+mkdir -p "$EXTRACT" "$BUILD/bin" "$UPSTREAM_BUILD/bin"
 tar -xzf "$ARCHIVE" -C "$EXTRACT"
 
 TOP_LEVEL=$(find "$EXTRACT" -mindepth 1 -maxdepth 1 -type d -print)
@@ -42,4 +44,11 @@ cp "$TOP_LEVEL/share/tess-server/build-provenance.json" "$BUILD/build-provenance
 chmod 755 "$BUILD/bin/tess-server"
 chmod 644 "$BUILD/bin/default.metallib" "$BUILD/build-provenance.json"
 
-METADATA_RESTAGE=1 "$REPO/scripts/stage-release.sh" "$BUILD/bin" "$VER" "$BID" internal
+cp "$TOP_LEVEL/bin/upstream/tess-server" "$UPSTREAM_BUILD/bin/llama-server"
+cp "$TOP_LEVEL/bin/upstream/default.metallib" "$UPSTREAM_BUILD/bin/default.metallib"
+cp "$TOP_LEVEL/share/tess-server/engines/upstream/build-provenance.json" "$UPSTREAM_BUILD/build-provenance.json"
+chmod 755 "$UPSTREAM_BUILD/bin/llama-server"
+chmod 644 "$UPSTREAM_BUILD/bin/default.metallib" "$UPSTREAM_BUILD/build-provenance.json"
+
+TESS_UPSTREAM_BIN="$UPSTREAM_BUILD/bin" METADATA_RESTAGE=1 \
+  "$REPO/scripts/stage-release.sh" "$BUILD/bin" "$VER" "$BID" internal

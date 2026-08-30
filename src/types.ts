@@ -9,6 +9,7 @@ export interface ProfileModel {
   quant_label: string;
   total_params: string;
   active_params: string | null;
+  format?: 'gguf' | 'mlx';
 }
 
 export interface ProfileShard {

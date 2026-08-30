@@ -14,6 +14,9 @@ UPSTREAM_BIN=$(CDPATH= cd -- "$UPSTREAM_BIN" && pwd)
 UPSTREAM_BUILD_DIR=$(CDPATH= cd -- "$UPSTREAM_BIN/.." && pwd)
 UPSTREAM_PROVENANCE="$UPSTREAM_BUILD_DIR/build-provenance.json"
 UPSTREAM_DSYM="$UPSTREAM_BUILD_DIR/tess-server.dSYM"
+MLX_ARCHIVE=${TESS_MLX_ARCHIVE:?set TESS_MLX_ARCHIVE to the qualified Tess MLX archive}
+MLX_ARCHIVE=$(CDPATH= cd -- "$(dirname -- "$MLX_ARCHIVE")" && pwd)/$(basename -- "$MLX_ARCHIVE")
+MLX_CHECKSUMS=$(dirname -- "$MLX_ARCHIVE")/SHA256SUMS
 METADATA_RESTAGE=${METADATA_RESTAGE:-0}
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 DIST_DIR=${DIST_DIR:-$REPO/dist/$BID-$CHANNEL}
@@ -32,6 +35,13 @@ else
 fi
 [ -f "$PROVENANCE" ] || { echo "FAIL: missing measured build provenance beside bin/: $PROVENANCE" >&2; exit 1; }
 [ -f "$UPSTREAM_PROVENANCE" ] || { echo "FAIL: missing upstream build provenance beside bin/: $UPSTREAM_PROVENANCE" >&2; exit 1; }
+[ -f "$MLX_ARCHIVE" ] || { echo "FAIL: missing qualified Tess MLX archive: $MLX_ARCHIVE" >&2; exit 1; }
+[ -f "$MLX_CHECKSUMS" ] || { echo "FAIL: missing Tess MLX SHA256SUMS: $MLX_CHECKSUMS" >&2; exit 1; }
+MLX_ARCHIVE_NAME=$(basename -- "$MLX_ARCHIVE")
+MLX_ARCHIVE_EXPECTED=$(awk -v name="$MLX_ARCHIVE_NAME" '$2 == name {print $1}' "$MLX_CHECKSUMS")
+[ "$(printf '%s\n' "$MLX_ARCHIVE_EXPECTED" | sed '/^$/d' | wc -l | tr -d ' ')" = 1 ] || { echo "FAIL: Tess MLX archive must have exactly one adjacent checksum row" >&2; exit 1; }
+MLX_ARCHIVE_SHA=$(shasum -a 256 "$MLX_ARCHIVE" | awk '{print $1}')
+[ "$MLX_ARCHIVE_SHA" = "$MLX_ARCHIVE_EXPECTED" ] || { echo "FAIL: Tess MLX archive checksum mismatch" >&2; exit 1; }
 case "$METADATA_RESTAGE" in 0|1) ;; *) echo "FAIL: METADATA_RESTAGE must be 0 or 1" >&2; exit 2 ;; esac
 if [ "$METADATA_RESTAGE" = 1 ]; then
   [ "$CHANNEL" = internal ] || { echo "FAIL: metadata restaging is limited to internal distributions" >&2; exit 1; }
@@ -49,11 +59,14 @@ STAGE_ROOT=$(mktemp -d /tmp/tess-stage.XXXXXX)
 VERIFY_ROOT=
 trap 'rm -rf "$STAGE_ROOT" ${VERIFY_ROOT:+"$VERIFY_ROOT"}' EXIT
 STAGE="$STAGE_ROOT/$NAME"
-mkdir -p "$STAGE/bin/upstream" "$STAGE/profiles" "$STAGE/scripts/serve" "$STAGE/share/tess-server/engines/upstream" "$STAGE/share/tess-server/licenses" "$STAGE/share/tess-server/templates"
+MLX_CHECK="$STAGE_ROOT/mlx-check"
+mkdir -p "$STAGE/bin/upstream" "$STAGE/bin/mlx" "$STAGE/profiles" "$STAGE/scripts/serve" "$STAGE/share/tess-server/engines/upstream" "$STAGE/share/tess-server/licenses" "$STAGE/share/tess-server/templates"
+mkdir -p "$STAGE/share/tess-server/mlx" "$MLX_CHECK"
 LICENSE_FILES=(
   cpp-httplib-MIT.txt
   llama.cpp-MIT.txt
   miniaudio-MIT-0.txt
+  mlx-MIT.txt
   nlohmann-json-MIT.txt
   poolside-OpenMDW-1.1.txt
   sheredom-subprocess-UNLICENSE.txt
@@ -77,13 +90,21 @@ cp "$UPSTREAM_PROVENANCE"            "$STAGE/share/tess-server/engines/upstream/
 cp "$REPO/README.md"                 "$STAGE/share/tess-server/README.md"
 cp "$REPO/THIRD_PARTY_NOTICES.md"    "$STAGE/share/tess-server/THIRD_PARTY_NOTICES"
 cp "$REPO/templates/laguna-s21-chat-template.jinja" "$STAGE/share/tess-server/templates/"
+tar -xzf "$MLX_ARCHIVE" -C "$MLX_CHECK"
+[ -f "$MLX_CHECK/tess-mlx/tess-mlx-manifest.json" ] || { echo "FAIL: Tess MLX manifest is missing" >&2; exit 1; }
+cp "$MLX_CHECK/tess-mlx/bin/mlx/tess-mlx-server" "$STAGE/bin/mlx/"
+cp "$MLX_CHECK/tess-mlx/bin/mlx/libmlx.dylib" "$STAGE/bin/mlx/"
+cp "$MLX_CHECK/tess-mlx/bin/mlx/libjaccl.dylib" "$STAGE/bin/mlx/"
+cp "$MLX_CHECK/tess-mlx/bin/mlx/mlx.metallib" "$STAGE/bin/mlx/"
+cp "$MLX_CHECK/tess-mlx/share/tess-mlx/deepseek-v4-flash-0731-2.4bit-mixed.json" "$STAGE/share/tess-server/mlx/model-profile.json"
+cp "$MLX_CHECK/tess-mlx/tess-mlx-manifest.json" "$STAGE/share/tess-server/mlx/tess-mlx-manifest.json"
 for license_file in "${LICENSE_FILES[@]}"; do
   [ -f "$REPO/licenses/$license_file" ] || { echo "FAIL: missing license text: $license_file" >&2; exit 1; }
   cp "$REPO/licenses/$license_file" "$STAGE/share/tess-server/licenses/"
 done
 cp "$LICENSE_SOURCE"                 "$STAGE/share/tess-server/LICENSE"
-chmod 755 "$STAGE/bin/tess-server" "$STAGE/bin/upstream/tess-server" "$STAGE/scripts/verify-profile.sh" "$STAGE/scripts/install.sh" "$STAGE/scripts/rollback.sh" "$STAGE/scripts/uninstall.sh" "$STAGE"/scripts/serve/*.sh
-chmod 644 "$STAGE/bin/default.metallib" "$STAGE/bin/upstream/default.metallib" "$STAGE/scripts/profile-common.sh" "$STAGE/scripts/install-common.sh" "$STAGE"/profiles/*.json "$STAGE"/share/tess-server/engines/upstream/build-provenance.json "$STAGE"/share/tess-server/licenses/*.txt "$STAGE"/share/tess-server/templates/*.jinja
+chmod 755 "$STAGE/bin/tess-server" "$STAGE/bin/upstream/tess-server" "$STAGE/bin/mlx/tess-mlx-server" "$STAGE/scripts/verify-profile.sh" "$STAGE/scripts/install.sh" "$STAGE/scripts/rollback.sh" "$STAGE/scripts/uninstall.sh" "$STAGE"/scripts/serve/*.sh
+chmod 644 "$STAGE/bin/default.metallib" "$STAGE/bin/upstream/default.metallib" "$STAGE/bin/mlx/libmlx.dylib" "$STAGE/bin/mlx/libjaccl.dylib" "$STAGE/bin/mlx/mlx.metallib" "$STAGE/scripts/profile-common.sh" "$STAGE/scripts/install-common.sh" "$STAGE"/profiles/*.json "$STAGE"/share/tess-server/engines/upstream/build-provenance.json "$STAGE"/share/tess-server/licenses/*.txt "$STAGE"/share/tess-server/templates/*.jinja "$STAGE/share/tess-server/mlx/model-profile.json" "$STAGE/share/tess-server/mlx/tess-mlx-manifest.json"
 
 # --- product/static closure ---
 file "$STAGE/bin/tess-server" | grep -q 'Mach-O 64-bit executable arm64' || { echo "FAIL: executable is not thin arm64" >&2; exit 1; }
@@ -136,6 +157,60 @@ else
 fi
 "$REPO/scripts/tests/test-product-security.sh" "$STAGE/bin/tess-server" >/dev/null
 
+# --- Tess MLX closure ---
+if tar -tzf "$MLX_ARCHIVE" | awk 'BEGIN { bad=0 } /^\// { bad=1 } /(^|\/)\.\.(\/|$)/ { bad=1 } NF && $0 !~ /^tess-mlx\// && $0 != "tess-mlx" { bad=1 } END { exit bad ? 0 : 1 }'; then
+  echo "FAIL: unsafe or unexpected path in Tess MLX archive" >&2
+  exit 1
+fi
+if find "$MLX_CHECK" -type l -o -type b -o -type c -o -type p -o -type s | grep -q .; then
+  echo "FAIL: Tess MLX archive contains a link or special file" >&2
+  exit 1
+fi
+(cd "$MLX_CHECK/tess-mlx" && shasum -a 256 -c SHA256SUMS >/dev/null) || { echo "FAIL: Tess MLX inner checksums failed" >&2; exit 1; }
+MLX_SERVER="$STAGE/bin/mlx/tess-mlx-server"
+MLX_LIBRARY="$STAGE/bin/mlx/libmlx.dylib"
+MLX_JACCL="$STAGE/bin/mlx/libjaccl.dylib"
+MLX_METALLIB="$STAGE/bin/mlx/mlx.metallib"
+MLX_MANIFEST="$STAGE/share/tess-server/mlx/tess-mlx-manifest.json"
+file "$MLX_SERVER" | grep -q 'Mach-O 64-bit executable arm64' || { echo "FAIL: Tess MLX server is not thin arm64" >&2; exit 1; }
+file "$MLX_LIBRARY" | grep -q 'Mach-O 64-bit dynamically linked shared library arm64' || { echo "FAIL: libmlx is not thin arm64" >&2; exit 1; }
+file "$MLX_JACCL" | grep -q 'Mach-O 64-bit dynamically linked shared library arm64' || { echo "FAIL: libjaccl is not thin arm64" >&2; exit 1; }
+MLX_BAD_DEPS=$(otool -L "$MLX_SERVER" | tail -n +2 | awk '{print $1}' | grep -Ev '^(@rpath/libmlx\.dylib|/System/Library/|/usr/lib/)' || true)
+[ -z "$MLX_BAD_DEPS" ] || { echo "FAIL: Tess MLX server has an unexpected dependency: $MLX_BAD_DEPS" >&2; exit 1; }
+MLX_LIBRARY_BAD_DEPS=$(otool -L "$MLX_LIBRARY" | tail -n +2 | awk '{print $1}' | grep -Ev '^(@rpath/libmlx\.dylib|@rpath/libjaccl\.dylib|/System/Library/|/usr/lib/)' || true)
+[ -z "$MLX_LIBRARY_BAD_DEPS" ] || { echo "FAIL: libmlx has an unexpected dependency: $MLX_LIBRARY_BAD_DEPS" >&2; exit 1; }
+[ "$(otool -l "$MLX_SERVER" | awk '/LC_RPATH/{getline; getline; print $2}')" = '@executable_path' ] || { echo "FAIL: Tess MLX server is not package-relocatable" >&2; exit 1; }
+MLX_BINARY_MINOS=$(vtool -show-build "$MLX_SERVER" | awk '$1 == "minos" {print $2; exit}')
+[ "$MLX_BINARY_MINOS" = 26.2 ] || { echo "FAIL: Tess MLX server minOS is $MLX_BINARY_MINOS, expected 26.2" >&2; exit 1; }
+codesign --verify --strict "$MLX_SERVER"
+MLX_VERSION_JSON=$("$MLX_SERVER" --version-json)
+[ "$(printf '%s\n' "$MLX_VERSION_JSON" | plutil -extract product raw -o - -)" = tess-mlx-server ] || { echo "FAIL: Tess MLX product identity mismatch" >&2; exit 1; }
+[ "$(printf '%s\n' "$MLX_VERSION_JSON" | plutil -extract version raw -o - -)" = "$VER" ] || { echo "FAIL: Tess MLX version mismatch" >&2; exit 1; }
+[ "$(printf '%s\n' "$MLX_VERSION_JSON" | plutil -extract build_id raw -o - -)" = "$BID" ] || { echo "FAIL: Tess MLX build ID mismatch" >&2; exit 1; }
+[ "$(printf '%s\n' "$MLX_VERSION_JSON" | plutil -extract distribution raw -o - -)" = "$("$STAGE/bin/tess-server" --version-json | plutil -extract distribution raw -o - -)" ] || { echo "FAIL: Tess MLX distribution mismatch" >&2; exit 1; }
+[ "$(printf '%s\n' "$MLX_VERSION_JSON" | plutil -extract libmlx_sha256 raw -o - -)" = "$(shasum -a 256 "$MLX_LIBRARY" | awk '{print $1}')" ] || { echo "FAIL: Tess MLX library hash mismatch" >&2; exit 1; }
+[ "$(printf '%s\n' "$MLX_VERSION_JSON" | plutil -extract metallib_sha256 raw -o - -)" = "$(shasum -a 256 "$MLX_METALLIB" | awk '{print $1}')" ] || { echo "FAIL: Tess MLX metallib hash mismatch" >&2; exit 1; }
+python3 - "$MLX_MANIFEST" "$VER" "$BID" <<'PY'
+import json, sys
+path, version, build_id = sys.argv[1:]
+with open(path, encoding="utf-8") as handle:
+    manifest = json.load(handle)
+if manifest.get("product") != "tess-mlx" or manifest.get("tess_server_version") != version or manifest.get("build_id") != build_id:
+    raise SystemExit("Tess MLX manifest identity mismatch")
+if manifest.get("platform") != "darwin-arm64" or manifest.get("minimum_macos") != "26.2" or manifest.get("source_tree_clean") is not True:
+    raise SystemExit("Tess MLX source/platform attestation is invalid")
+policy = manifest.get("policy", {})
+required = {"target_only": True, "single_slot": True, "loopback_only": True, "python_runtime_included": False, "python_source_included": False, "model_payload_included": False, "dspark_included": False}
+if any(policy.get(key) is not value for key, value in required.items()):
+    raise SystemExit("Tess MLX policy attestation is invalid")
+if manifest.get("mlx_version") != "0.32.0" or len(manifest.get("mlx_commit", "")) != 40:
+    raise SystemExit("Tess MLX dependency identity is invalid")
+PY
+if find "$MLX_CHECK/tess-mlx" -type f \( -name '*.py' -o -name '*.pyc' -o -name '*.h' -o -name '*.metal' -o -name '*.safetensors' -o -name '*.dSYM' \) | grep -q .; then
+  echo "FAIL: Tess MLX archive contains Python, source, model, or debug material" >&2
+  exit 1
+fi
+
 # --- scans ---
 fail=0
 if strings - "$STAGE/bin/tess-server" | grep -E "/Users/[^/[:space:]]+" > "$STAGE_ROOT/pathleaks.txt" 2>/dev/null && [ -s "$STAGE_ROOT/pathleaks.txt" ]; then
@@ -150,6 +225,14 @@ fi
 if strings - "$STAGE/bin/upstream/default.metallib" | grep -cE "/Users/[^/[:space:]]+" | grep -qv '^0$'; then
   echo "WARN: personal paths in upstream metallib"; fail=1
 fi
+if strings - "$STAGE/bin/mlx/tess-mlx-server" | grep -E "/Users/[^/[:space:]]+" > "$STAGE_ROOT/mlx-pathleaks.txt" 2>/dev/null && [ -s "$STAGE_ROOT/mlx-pathleaks.txt" ]; then
+  echo "WARN: personal paths in Tess MLX server:"; sort -u "$STAGE_ROOT/mlx-pathleaks.txt" | head -5; fail=1
+fi
+for mlx_payload in "$STAGE/bin/mlx/libmlx.dylib" "$STAGE/bin/mlx/libjaccl.dylib" "$STAGE/bin/mlx/mlx.metallib"; do
+  if strings - "$mlx_payload" | grep -cE "/Users/[^/[:space:]]+" | grep -qv '^0$'; then
+    echo "WARN: personal paths in Tess MLX payload: $(basename -- "$mlx_payload")"; fail=1
+  fi
+done
 strings - "$STAGE/bin/upstream/default.metallib" | grep -F 'kernel_mul_mv_ext_bf16_f32_r1_2' >/dev/null || { echo "FAIL: upstream metallib lacks required BF16 pipelines" >&2; exit 1; }
 if find "$STAGE" -type f \( -name "*.json" -o -name "*.jinja" -o -name "*.md" -o -name "*.sh" -o -name "*.txt" \) -print0 | xargs -0 grep -nE '/Users/[^/[:space:]]+' > "$STAGE_ROOT/text-pathleaks.txt" 2>/dev/null; then
   echo "WARN: personal paths in staged text:"; head -5 "$STAGE_ROOT/text-pathleaks.txt"; fail=1
@@ -163,7 +246,10 @@ fi
 if strings - "$STAGE/bin/upstream/tess-server" | grep -E "kernel void kernel_" > "$STAGE_ROOT/upstream-metal-source.txt"; then
   echo "FAIL: plaintext Metal source in upstream executable"; exit 1
 fi
-RESIDUE=$(find "$STAGE" \( -name "*.metal" -o -name "*.h" -o -name "*.log" -o -name ".DS_Store" \) -print)
+if strings - "$STAGE/bin/mlx/tess-mlx-server" | grep -E "kernel void kernel_" > "$STAGE_ROOT/mlx-metal-source.txt"; then
+  echo "FAIL: plaintext Metal source in Tess MLX server"; exit 1
+fi
+RESIDUE=$(find "$STAGE" \( -name "*.metal" -o -name "*.h" -o -name "*.py" -o -name "*.pyc" -o -name "*.log" -o -name ".DS_Store" \) -print)
 [ -z "$RESIDUE" ] || { echo "FAIL: source/log residue staged: $RESIDUE"; exit 1; }
 
 # --- manifest ---
@@ -172,20 +258,38 @@ LIB_SHA=$(openssl dgst -sha256 -r "$STAGE/bin/default.metallib" | awk '{print $1
 UPSTREAM_EXE_SHA=$(openssl dgst -sha256 -r "$STAGE/bin/upstream/tess-server" | awk '{print $1}')
 UPSTREAM_LIB_SHA=$(openssl dgst -sha256 -r "$STAGE/bin/upstream/default.metallib" | awk '{print $1}')
 VJ=$("$STAGE/bin/tess-server" --version-json)
-python3 - "$STAGE" "$NAME" "$VER" "$BID" "$CHANNEL" "$EXE_SHA" "$LIB_SHA" "$UPSTREAM_EXE_SHA" "$UPSTREAM_LIB_SHA" "$REPO" "$BINARY_MINOS" "$BINARY_SDK" "$UPSTREAM_BINARY_MINOS" "$UPSTREAM_BINARY_SDK" << 'PY'
+python3 - "$STAGE" "$NAME" "$VER" "$BID" "$CHANNEL" "$EXE_SHA" "$LIB_SHA" "$UPSTREAM_EXE_SHA" "$UPSTREAM_LIB_SHA" "$REPO" "$BINARY_MINOS" "$BINARY_SDK" "$UPSTREAM_BINARY_MINOS" "$UPSTREAM_BINARY_SDK" "$MLX_ARCHIVE_SHA" << 'PY'
 import datetime, glob, json, os, re, subprocess, sys
-stage, name, ver, bid, channel, exe_sha, lib_sha, upstream_exe_sha, upstream_lib_sha, repo, actual_minos, actual_sdk, upstream_minos, upstream_sdk = sys.argv[1:15]
+stage, name, ver, bid, channel, exe_sha, lib_sha, upstream_exe_sha, upstream_lib_sha, repo, actual_minos, actual_sdk, upstream_minos, upstream_sdk, mlx_archive_sha = sys.argv[1:16]
 vj = json.loads(subprocess.check_output([f"{stage}/bin/tess-server", "--version-json"]))
 provenance = json.load(open(f"{stage}/share/tess-server/build-provenance.json"))
 upstream_provenance = json.load(open(f"{stage}/share/tess-server/engines/upstream/build-provenance.json"))
+tess_mlx_manifest = json.load(open(f"{stage}/share/tess-server/mlx/tess-mlx-manifest.json"))
+tess_mlx_vj = json.loads(subprocess.check_output([f"{stage}/bin/mlx/tess-mlx-server", "--version-json"]))
+if tess_mlx_manifest.get("product") != "tess-mlx" or tess_mlx_manifest.get("tess_server_version") != ver:
+    raise SystemExit("Tess MLX manifest does not match this Tess release")
+if tess_mlx_manifest.get("platform") != "darwin-arm64" or tess_mlx_manifest.get("minimum_macos") != "26.2":
+    raise SystemExit("Tess MLX manifest has an unsupported platform or deployment target")
+required_tess_mlx_policy = {
+    "target_only": True,
+    "single_slot": True,
+    "loopback_only": True,
+    "python_runtime_included": False,
+    "python_source_included": False,
+    "model_payload_included": False,
+    "dspark_included": False,
+}
+if any(tess_mlx_manifest.get("policy", {}).get(key) is not value for key, value in required_tess_mlx_policy.items()):
+    raise SystemExit("Tess MLX policy attestation is invalid")
 pkg_commit = subprocess.check_output(["git", "-C", repo, "rev-parse", "HEAD"], text=True).strip()
 profiles = {}
 upstream_profiles = {"dsv4-0731-dspark", "minimax-m27-iq4xs"}
+mlx_profiles = {"dsv4-0731-mlx-24mixed"}
 for p in sorted(glob.glob(f"{stage}/profiles/*.json")):
     d = json.load(open(p))
     profiles[d["profile_id"]] = {"schema_version": d["schema_version"],
         "sha256": subprocess.check_output(["openssl","dgst","-sha256","-r",p],text=True).split()[0],
-        "engine_variant": "upstream" if d["profile_id"] in upstream_profiles else "primary"}
+        "engine_variant": "tess-mlx" if d["profile_id"] in mlx_profiles else "upstream" if d["profile_id"] in upstream_profiles else "primary"}
 files = {}
 for p in sorted(glob.glob(f"{stage}/**/*", recursive=True)):
     if not os.path.isfile(p):
@@ -211,6 +315,26 @@ manifest = {
       "engine_commit": upstream_provenance["source"]["engine_commit"], "upstream_merge_base": upstream_provenance["source"]["upstream_merge_base"],
       "binary_sha256": upstream_exe_sha, "metallib_sha256": upstream_lib_sha,
     },
+  },
+  "tess_mlx": {
+    "binary": "bin/mlx/tess-mlx-server",
+    "libmlx": "bin/mlx/libmlx.dylib",
+    "libjaccl": "bin/mlx/libjaccl.dylib",
+    "metallib": "bin/mlx/mlx.metallib",
+    "model_profile": "share/tess-server/mlx/model-profile.json",
+    "manifest": "share/tess-server/mlx/tess-mlx-manifest.json",
+    "source_archive_sha256": mlx_archive_sha,
+    "version": tess_mlx_manifest["tess_server_version"],
+    "mlx_version": tess_mlx_manifest["mlx_version"],
+    "build_id": tess_mlx_manifest["build_id"],
+    "engine_commit": tess_mlx_manifest["engine_commit"],
+    "mlx_commit": tess_mlx_manifest["mlx_commit"],
+    "distribution": tess_mlx_manifest["distribution"],
+    "policy": required_tess_mlx_policy,
+    "binary_sha256": files["bin/mlx/tess-mlx-server"]["sha256"],
+    "libmlx_sha256": files["bin/mlx/libmlx.dylib"]["sha256"],
+    "libjaccl_sha256": files["bin/mlx/libjaccl.dylib"]["sha256"],
+    "metallib_sha256": files["bin/mlx/mlx.metallib"]["sha256"],
   },
   "toolchain": provenance["toolchain"],
   "build_target": vj["build_target"], "min_macos": vj["min_macos"],
@@ -258,6 +382,9 @@ components = [
     ("SPDXRef-Package-stb", "stb_image", "2.30", "MIT", "Copyright (c) 2017 Sean Barrett", "LIBRARY"),
     ("SPDXRef-Package-sheredom-subprocess", "sheredom-subprocess.h", None, "Unlicense", "NOASSERTION", "LIBRARY"),
     ("SPDXRef-Package-miniaudio", "miniaudio", "0.11.25", "MIT-0", "Copyright 2026 David Reid", "LIBRARY"),
+    ("SPDXRef-Package-tess-mlx", "Tess MLX runtime", tess_mlx_manifest["mlx_version"], "MIT", "Copyright (c) 2023 Apple Inc.", "LIBRARY"),
+    ("SPDXRef-Package-tess-mlx-cpp-httplib", "cpp-httplib (Tess MLX server)", "0.49.0", "MIT", "Copyright (c) 2017 yhirose", "LIBRARY"),
+    ("SPDXRef-Package-tess-mlx-nlohmann-json", "nlohmann-json (Tess MLX server)", "3.12.0", "MIT", "Copyright (c) 2013-2025 Niels Lohmann", "LIBRARY"),
 ]
 created = datetime.datetime.fromtimestamp(
     int(provenance["source"]["source_date_epoch"]), datetime.timezone.utc
@@ -297,7 +424,11 @@ sbom = {
     "relationships": [
         {"spdxElementId": "SPDXRef-DOCUMENT", "relationshipType": "DESCRIBES", "relatedSpdxElement": "SPDXRef-Package-tess-server"}
     ] + [
-        {"spdxElementId": "SPDXRef-Package-tess-server", "relationshipType": "STATIC_LINK", "relatedSpdxElement": spdx_id}
+        {
+            "spdxElementId": "SPDXRef-Package-tess-server",
+            "relationshipType": "DEPENDS_ON" if spdx_id.startswith("SPDXRef-Package-tess-mlx") else "STATIC_LINK",
+            "relatedSpdxElement": spdx_id,
+        }
         for spdx_id, *_ in components[1:]
     ],
 }

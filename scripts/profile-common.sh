@@ -56,7 +56,7 @@ tess_reject_unmodeled_tuning_env() {
   allowed=" $* "
   while IFS='=' read -r key ignored; do
     case "$key" in
-      GGML_*|LLAMA_*|MLX_*|MTL_*)
+      GGML_*|LLAMA_*|MLX_*|MTL_*|TESS_MLX_*|DYLD_*)
         case "$allowed" in
           *" $key "*) ;;
           *) tess_die "unmodeled tuning environment variable is set: $key; use the profile defaults or invoke tess-server directly for a custom run" ;;
@@ -150,8 +150,28 @@ tess_resolve_server() {
 tess_profile_engine_variant() {
   case "$1" in
     dsv4-0731-dspark|minimax-m27-iq4xs) printf '%s\n' upstream ;;
+    dsv4-0731-mlx-24mixed) printf '%s\n' tess-mlx ;;
     *) printf '%s\n' primary ;;
   esac
+}
+
+tess_profile_begin_mlx() {
+  local expected_id actual_id manifest manifest_variant
+  expected_id=$1
+  TESS_PROFILE_FILE="$TESS_PROFILE_DIR/$expected_id.json"
+  [ -f "$TESS_PROFILE_FILE" ] || tess_die "profile descriptor not found: $expected_id.json"
+  [ "$TESS_PROFILE_FILE" = "$TESS_PACKAGE_ROOT/profiles/$expected_id.json" ] || tess_die "verified launch requires the packaged profile descriptor"
+  tess_verify_payload_file "profiles/$expected_id.json"
+  actual_id=$(tess_profile_get profile_id) || tess_die "profile_id missing from $expected_id.json"
+  [ "$actual_id" = "$expected_id" ] || tess_die "profile ID does not match its filename"
+  TESS_PROFILE_ID=$actual_id
+  TESS_ENGINE_VARIANT=$(tess_profile_engine_variant "$TESS_PROFILE_ID")
+  [ "$TESS_ENGINE_VARIANT" = tess-mlx ] || tess_die "profile is not routed to Tess MLX"
+  manifest="$TESS_PACKAGE_ROOT/share/tess-server/manifest.json"
+  [ -f "$manifest" ] || tess_die "packaged release manifest is missing"
+  tess_verify_payload_file share/tess-server/manifest.json
+  manifest_variant=$(/usr/bin/plutil -extract "profiles.$TESS_PROFILE_ID.engine_variant" raw -o - "$manifest" 2>/dev/null) || tess_die "release manifest lacks the engine route for $TESS_PROFILE_ID"
+  [ "$manifest_variant" = tess-mlx ] || tess_die "runtime and release manifest disagree on the engine route for $TESS_PROFILE_ID"
 }
 
 tess_profile_begin() {
@@ -282,12 +302,16 @@ tess_verify_collection() {
   local collection first_path directory index name bytes sha path
   collection=$1
   first_path=$2
-  directory=$(dirname -- "$first_path")
+  if [ -d "$first_path" ]; then
+    directory=$first_path
+  else
+    directory=$(dirname -- "$first_path")
+  fi
   index=0
   while name=$(tess_profile_get "$collection.$index.name"); do
     bytes=$(tess_profile_get "$collection.$index.bytes") || tess_die "bytes missing for $name"
     sha=$(tess_profile_get "$collection.$index.sha256") || tess_die "sha256 missing for $name"
-    if [ "$index" = "0" ]; then
+    if [ "$index" = "0" ] && [ ! -d "$first_path" ]; then
       path=$first_path
     else
       path="$directory/$name"
@@ -296,6 +320,57 @@ tess_verify_collection() {
     index=$((index + 1))
   done
   [ "$index" -gt 0 ] || tess_die "profile collection is empty: $collection"
+}
+
+tess_resolve_mlx_server() {
+  local binary_rel libmlx_rel libjaccl_rel metallib_rel model_profile_rel tess_mlx_manifest_rel
+  local release_manifest version_json product version expected_version field release_value binary_value
+  local mlx_product mlx_version mlx_clean mlx_target mlx_python mlx_dspark
+  binary_rel=bin/mlx/tess-mlx-server
+  libmlx_rel=bin/mlx/libmlx.dylib
+  libjaccl_rel=bin/mlx/libjaccl.dylib
+  metallib_rel=bin/mlx/mlx.metallib
+  model_profile_rel=share/tess-server/mlx/model-profile.json
+  tess_mlx_manifest_rel=share/tess-server/mlx/tess-mlx-manifest.json
+  for field in "$binary_rel" "$libmlx_rel" "$libjaccl_rel" "$metallib_rel" "$model_profile_rel" "$tess_mlx_manifest_rel"; do
+    tess_verify_payload_file "$field"
+    [ ! -L "$TESS_PACKAGE_ROOT/$field" ] || tess_die "Tess MLX payload contains an unsafe link: $field"
+  done
+  [ -x "$TESS_PACKAGE_ROOT/$binary_rel" ] || tess_die "packaged Tess MLX server is not executable"
+  TESS_MLX_SERVER="$TESS_PACKAGE_ROOT/$binary_rel"
+  TESS_MLX_MODEL_PROFILE="$TESS_PACKAGE_ROOT/$model_profile_rel"
+
+  mlx_product=$(/usr/bin/plutil -extract product raw -o - "$TESS_PACKAGE_ROOT/$tess_mlx_manifest_rel" 2>/dev/null) || tess_die "Tess MLX manifest lacks product"
+  mlx_version=$(/usr/bin/plutil -extract tess_server_version raw -o - "$TESS_PACKAGE_ROOT/$tess_mlx_manifest_rel" 2>/dev/null) || tess_die "Tess MLX manifest lacks Tess version"
+  mlx_clean=$(/usr/bin/plutil -extract source_tree_clean raw -o - "$TESS_PACKAGE_ROOT/$tess_mlx_manifest_rel" 2>/dev/null) || tess_die "Tess MLX manifest lacks source cleanliness"
+  mlx_target=$(/usr/bin/plutil -extract policy.target_only raw -o - "$TESS_PACKAGE_ROOT/$tess_mlx_manifest_rel" 2>/dev/null) || tess_die "Tess MLX manifest lacks target-only policy"
+  mlx_python=$(/usr/bin/plutil -extract policy.python_runtime_included raw -o - "$TESS_PACKAGE_ROOT/$tess_mlx_manifest_rel" 2>/dev/null) || tess_die "Tess MLX manifest lacks Python policy"
+  mlx_dspark=$(/usr/bin/plutil -extract policy.dspark_included raw -o - "$TESS_PACKAGE_ROOT/$tess_mlx_manifest_rel" 2>/dev/null) || tess_die "Tess MLX manifest lacks DSpark policy"
+  [ "$mlx_product" = tess-mlx ] || tess_die "Tess MLX manifest product mismatch"
+  [ "$mlx_clean" = true ] || tess_die "Tess MLX payload was not built from a clean source tree"
+  [ "$mlx_target" = true ] && [ "$mlx_python" = false ] && [ "$mlx_dspark" = false ] || tess_die "Tess MLX payload policy is not target-only and Python-free"
+
+  expected_version=$(tess_profile_get engine.min_version) || tess_die "profile engine version is missing"
+  [ "$mlx_version" = "$expected_version" ] || tess_die "Tess MLX payload version does not match the profile"
+  version_json=$("$TESS_MLX_SERVER" --version-json 2>/dev/null) || tess_die "Tess MLX server does not provide --version-json"
+  product=$(printf '%s\n' "$version_json" | tess_json_get product) || tess_die "invalid Tess MLX --version-json output"
+  version=$(printf '%s\n' "$version_json" | tess_json_get version) || tess_die "Tess MLX version is missing"
+  [ "$product" = tess-mlx-server ] || tess_die "selected binary is not Tess MLX"
+  [ "$version" = "$expected_version" ] || tess_die "profile requires Tess $expected_version; Tess MLX server is $version"
+  for field in build_id engine_commit mlx_commit distribution; do
+    release_value=$(/usr/bin/plutil -extract "$field" raw -o - "$TESS_PACKAGE_ROOT/$tess_mlx_manifest_rel" 2>/dev/null) || tess_die "Tess MLX manifest lacks $field"
+    binary_value=$(printf '%s\n' "$version_json" | tess_json_get "$field") || tess_die "Tess MLX version JSON lacks $field"
+    [ "$release_value" = "$binary_value" ] || tess_die "Tess MLX binary/manifest mismatch: $field"
+  done
+  [ "$(printf '%s\n' "$version_json" | tess_json_get libmlx_sha256)" = "$(tess_payload_checksum "$libmlx_rel")" ] || tess_die "Tess MLX library identity mismatch"
+  [ "$(printf '%s\n' "$version_json" | tess_json_get metallib_sha256)" = "$(tess_payload_checksum "$metallib_rel")" ] || tess_die "Tess MLX metallib identity mismatch"
+
+  release_manifest="$TESS_PACKAGE_ROOT/share/tess-server/manifest.json"
+  for field in version build_id engine_commit mlx_commit distribution; do
+    release_value=$(/usr/bin/plutil -extract "tess_mlx.$field" raw -o - "$release_manifest" 2>/dev/null) || tess_die "release manifest lacks Tess MLX $field"
+    binary_value=$(printf '%s\n' "$version_json" | tess_json_get "$field") || tess_die "Tess MLX version JSON lacks $field"
+    [ "$release_value" = "$binary_value" ] || tess_die "Tess MLX release identity mismatch: $field"
+  done
 }
 
 tess_verify_profile_files() {

@@ -37,7 +37,7 @@ test('passes an exact companion to profiled DFlash launchers', () => {
   assert.deepEqual(verifySpec('/payload', laguna).args, ['/payload/scripts/verify-profile.sh', 'laguna-s21-q4km-dflash', laguna.modelPath, laguna.draftPath]);
 });
 
-test('maps every 0.1.5 profile to its packaged launcher', () => {
+test('maps every GGUF profile to its packaged launcher', () => {
   assert.equal(serveSpec('/payload', {...candidate, profile: {...profile, profile_id: 'qwen35-122b-a10b-q4km'} as ProfileDescriptor}).args[0], '/payload/scripts/serve/serve-qwen35-122b.sh');
   assert.equal(serveSpec('/payload', {...candidate, profile: {...profile, profile_id: 'inkling-small-iq3xxs'} as ProfileDescriptor}).args[0], '/payload/scripts/serve/serve-inkling.sh');
   assert.equal(serveSpec('/payload', {...candidate, profile: {...profile, profile_id: 'dsv4-0731-dspark'} as ProfileDescriptor}).args[0], '/payload/scripts/serve/serve-dsv4-0731.sh');
@@ -65,6 +65,21 @@ test('leaves DSpark on by profile default and passes the user opt-out', () => {
   assert.equal(defaultSpec.env.DSPARK, '/models/dspark.gguf');
   const targetOnlySpec = serveSpec('/payload', dsv4, {context: 16384, speculation: 'off'});
   assert.equal(targetOnlySpec.env.DRAFT, '0');
+});
+
+test('routes the MLX profile through its packaged Tess MLX target-only runtime', () => {
+  const mlxProfile = {...profile, profile_id: 'dsv4-0731-mlx-24mixed'} as ProfileDescriptor;
+  const mlx: ModelCandidate = {
+    kind: 'profiled', profile: mlxProfile, modelPath: '/models/deepseek-mlx', complete: true, issues: [],
+  };
+  const defaultSpec = serveSpec('/payload', mlx, {context: 32768});
+  assert.deepEqual(defaultSpec.args, ['/payload/scripts/serve/serve-dsv4-0731-mlx.sh']);
+  assert.equal(defaultSpec.env.MODEL, '/models/deepseek-mlx');
+  assert.equal(defaultSpec.env.DRAFT, undefined);
+  const targetOnlySpec = serveSpec('/payload', mlx, {speculation: 'off', draftDepth: 2, pMin: 0.9});
+  assert.equal(targetOnlySpec.env.DRAFT, undefined);
+  assert.equal(targetOnlySpec.env.DMAX, undefined);
+  assert.equal(targetOnlySpec.env.PMIN, undefined);
 });
 
 test('builds a configurable generic GGUF launcher with detected companions', () => {

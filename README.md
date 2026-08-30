@@ -25,7 +25,7 @@ tess-server doctor
 tess-server
 ```
 
-One package, no external dependencies: no Homebrew, no Python, no separate engine install. The guided terminal app discovers GGUF models on internal and attached storage, verifies them against versioned profiles, and serves them with managed, qualified settings. Model weights are not bundled; you obtain and store GGUF files under their respective licenses.
+One package, no external dependencies: no Homebrew, no system Python, no separate engine install. The guided terminal app discovers GGUF and qualified MLX models on internal and attached storage, verifies them against versioned profiles, and serves them with managed settings. Model weights are not bundled; you obtain and store them under their respective licenses.
 
 ## The numbers
 
@@ -53,7 +53,7 @@ Depth is the other frontier. MiniMax-M2.7 serves its **full 196,608-token traine
 
 ## Lossless speculative decoding, packaged
 
-Six of the ten profiles ship with managed speculative decoding — DFlash for Laguna and Muse Glimmer, DSpark for both exact DeepSeek-V4-Flash artifact generations, and multi-token-prediction for Tess-4 and Hy3 — pre-tuned and on by default where specified. The interface displays the exact qualification boundary when a selectable configuration extends beyond the recorded identity evidence.
+Six of the eleven profiles ship with managed speculative decoding — DFlash for Laguna and Muse Glimmer, DSpark for the DeepSeek-V4-Flash GGUF profiles, and multi-token-prediction for Tess-4 and Hy3 — pre-tuned and on by default where specified. The first Tess MLX profile is intentionally target-only. The interface displays the exact qualification boundary when a selectable configuration extends beyond the recorded identity evidence.
 
 Speed never trades away correctness: **every accepted draft token is still verified by the target model.** Where speculation does not help, the profile simply does not use it.
 
@@ -61,7 +61,7 @@ Speed never trades away correctness: **every accepted draft token is still verif
 
 Large-model serving on a Mac has real failure modes: out-of-memory panics, silently wrong context windows, mismatched draft files. Tess Server's open-source TUI manages them instead of handing you forty flags:
 
-- Discovers profiled and unprofiled GGUF models under `~/models`, `~/Models`, and `models` or `Models` folders on attached volumes, plus any folder you add from the TUI or with `--model-root`.
+- Discovers profiled MLX model directories and profiled or unprofiled GGUF models under `~/models`, `~/Models`, and `models` or `Models` folders on attached volumes, plus any folder you add from the TUI or with `--model-root`.
 - Verifies model files against hash-bound profiles before the first launch — a mismatch is a startup error, not a warning.
 - Keeps every configured context choice selectable. Qualified tiers carry the verified claim; experimental or untested tiers display an explicit warning while memory-critical settings remain managed.
 - Groups nearby projector and draft/MTP artifacts under unprofiled primary models, with detected defaults and a complete generic configuration screen for clearly labeled best-effort launches.
@@ -74,7 +74,7 @@ Profile support is exact-file specific. Other primary GGUF files are shown as **
 
 ## Supported profiles
 
-The 0.1.5 release includes ten profiles. New exact-file profiles cover Qwen3.5-122B-A10B, Inkling-Small, Muse Glimmer 30B, and the archived DeepSeek-V4-Flash-0731 artifact set. Their verified defaults stop at the recorded qualification depths; larger configured contexts remain selectable with an explicit untested warning.
+The 0.1.6 release includes eleven profiles and adds Tess MLX, a C++ engine for the exact `mlx-community/DeepSeek-V4-Flash-0731-2.4bit-mixed` checkpoint. The adjacent MLX libraries and Metal library are bundled, relocatable, and checksum-bound; Python, oMLX, and mlx-lm are not product dependencies.
 
 | Model | Quantization | GGUF size | Memory class | Default context | Available context choices |
 |---|---|---:|---:|---:|---|
@@ -86,6 +86,7 @@ The 0.1.5 release includes ten profiles. New exact-file profiles cover Qwen3.5-1
 | **NVIDIA Nemotron-3-Super-120B-A12B** | UD-Q4_K_M | 76.9 GiB | 128 GiB | 32K | 32K, 64K, 128K, 256K; experimental 512K and 1M |
 | **DeepSeek-V4-Flash** | UD-IQ3_XXS + DSpark | 95.9 GiB + 10.5 GiB draft | 128 GiB | 32K | 4K, 8K, 16K, 32K, 64K, 128K, 256K; untested 512K and 1M |
 | **DeepSeek-V4-Flash-0731** | UD-IQ3_XXS + DSpark | 95.9 GiB + 10.5 GiB draft | 128 GiB | 8K | 4K-256K with DSpark by default; untested 512K and 1M; DSpark can be disabled |
+| **DeepSeek-V4-Flash-0731 MLX** | 2.4-bit mixed, Tess MLX target-only | 84.6 GiB | 128 GiB | 8K | Qualified 4K, 8K, 16K, and 32K |
 | **MiniMax-M2.7** | UD-IQ4_XS | 101 GiB | 128 GiB | 70K | 32K, 64K, 70K, 96K, 128K, 160K, 192K |
 | **Tencent Hy3** | IQ2_M | 93.1 GiB | 128 GiB | 32K | 8K, 16K, 32K, 48K; experimental 64K |
 
@@ -130,10 +131,10 @@ Streaming, tool calls, and standard chat completions are supported. If bearer au
 ## Requirements
 
 - Apple Silicon Mac (`arm64`).
-- macOS 15 or newer by deployment target. The current packaged qualification host is macOS 26.2; macOS 15.x remains compatibility-targeted until tested on a physical Sequoia installation.
+- macOS 15 or newer for the GGUF engines. Tess MLX currently requires macOS 26.2 or newer and is qualified on that release.
 - Node.js 22 or newer.
 - Sufficient unified memory for the selected profile.
-- Locally stored GGUF weights.
+- Locally stored weights for a supported GGUF or MLX profile.
 
 ## Command-line use
 
@@ -142,8 +143,8 @@ The interactive TUI is the recommended entry point. Scriptable commands are also
 ```bash
 tess-server profiles
 tess-server models --model-root /Volumes/Models
-tess-server verify --profile PROFILE_ID --model /path/to/model.gguf
-tess-server serve --profile PROFILE_ID --model /path/to/model.gguf --context 32768
+tess-server verify --profile PROFILE_ID --model /path/to/model-or-mlx-directory
+tess-server serve --profile PROFILE_ID --model /path/to/model-or-mlx-directory --context 32768
 tess-server doctor
 tess-server engine -- --help
 ```

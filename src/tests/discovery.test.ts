@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {mkdtemp, mkdir, realpath, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -31,6 +32,39 @@ test('discovers exact profile filenames recursively and checks sizes', async () 
     const mismatched = await discoverModels([fixtureProfile], [root]);
     assert.equal(mismatched[0]?.complete, false);
     assert.match(mismatched[0]?.issues[0] ?? '', /expected 6/);
+  } finally {
+    await rm(root, {recursive: true, force: true});
+  }
+});
+
+test('discovers a profiled MLX model directory by its safetensors index', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'tess-discovery-mlx-test.'));
+  try {
+    const modelDirectory = join(root, 'DeepSeek-MLX');
+    await mkdir(modelDirectory, {recursive: true});
+    await writeFile(join(modelDirectory, 'model.safetensors.index.json'), 'index!');
+    await writeFile(join(modelDirectory, 'model-00001-of-00001.safetensors'), 'weights');
+    const profile: ProfileDescriptor = {
+      ...fixtureProfile,
+      profile_id: 'fixture-mlx',
+      model: {...fixtureProfile.model, format: 'mlx', quant_label: '2.4-bit mixed MLX'},
+      shards: [
+        {name: 'model.safetensors.index.json', bytes: 6, sha256: createHash('sha256').update('index!').digest('hex')},
+        {name: 'model-00001-of-00001.safetensors', bytes: 7, sha256: '1'.repeat(64)},
+      ],
+    };
+    const candidates = await discoverModels([profile], [root]);
+    assert.equal(candidates.length, 1);
+    assert.equal(candidates[0]?.kind, 'profiled');
+    assert.equal(candidates[0]?.modelPath, await realpath(modelDirectory));
+    assert.equal(candidates[0]?.complete, true);
+
+    const unrelatedDirectory = join(root, 'Unrelated-MLX');
+    await mkdir(unrelatedDirectory, {recursive: true});
+    await writeFile(join(unrelatedDirectory, 'model.safetensors.index.json'), 'other!');
+    const withoutFalseMatch = await discoverModels([profile], [root]);
+    assert.equal(withoutFalseMatch.length, 1);
+    assert.equal(withoutFalseMatch[0]?.modelPath, await realpath(modelDirectory));
   } finally {
     await rm(root, {recursive: true, force: true});
   }

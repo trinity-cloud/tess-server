@@ -1,4 +1,5 @@
-import {readdir, realpath, stat} from 'node:fs/promises';
+import {createHash} from 'node:crypto';
+import {readFile, readdir, realpath, stat} from 'node:fs/promises';
 import {homedir} from 'node:os';
 import {basename, join, resolve} from 'node:path';
 import type {ModelCandidate, ProfileContextPreset, ProfileDescriptor, ProfileShard} from './types.js';
@@ -54,7 +55,7 @@ export async function defaultModelRoots(): Promise<string[]> {
   return normalizeModelRoots(candidates);
 }
 
-async function walkForGguf(root: string, maxDepth: number): Promise<string[]> {
+async function walkForModels(root: string, maxDepth: number): Promise<string[]> {
   const matches: string[] = [];
   const pending: Array<{path: string; depth: number}> = [{path: root, depth: 0}];
   while (pending.length > 0) {
@@ -70,7 +71,9 @@ async function walkForGguf(root: string, maxDepth: number): Promise<string[]> {
     }
     for (const entry of entries) {
       const path = join(current.path, entry.name);
-      if ((entry.isFile() || entry.isSymbolicLink()) && entry.name.toLowerCase().endsWith('.gguf')) {
+      const lowerName = entry.name.toLowerCase();
+      const modelArtifact = lowerName.endsWith('.gguf') || lowerName === 'model.safetensors.index.json';
+      if ((entry.isFile() || entry.isSymbolicLink()) && modelArtifact) {
         try {
           if ((await stat(path)).isFile()) {
             matches.push(path);
@@ -102,11 +105,25 @@ async function inspectCollection(directory: string, shards: ProfileShard[], issu
   }
 }
 
+async function matchesMlxProfileAnchor(path: string, shard: ProfileShard): Promise<boolean> {
+  try {
+    const info = await stat(path);
+    if (!info.isFile() || info.size !== shard.bytes) return false;
+    const digest = createHash('sha256').update(await readFile(path)).digest('hex');
+    return digest === shard.sha256;
+  } catch {
+    return false;
+  }
+}
+
 export async function candidateFromModelPath(profile: ProfileDescriptor, modelPath: string, explicitDraftPath?: string): Promise<ModelCandidate> {
   const resolved = resolve(expandHome(modelPath));
-  const directory = resolve(resolved, '..');
+  const isMlx = profile.model.format === 'mlx';
+  const directory = isMlx ? resolved : resolve(resolved, '..');
   const issues: string[] = [];
-  if (basename(resolved) !== profile.shards[0]?.name) {
+  if (isMlx && !(await isDirectory(resolved))) {
+    issues.push('expected an MLX model directory');
+  } else if (!isMlx && basename(resolved) !== profile.shards[0]?.name) {
     issues.push(`expected first shard ${profile.shards[0]?.name}`);
   }
   await inspectCollection(directory, profile.shards, issues);
@@ -234,7 +251,7 @@ async function genericCandidateFromModelPath(modelPath: string, allPaths: string
 
 export async function discoverModels(profiles: ProfileDescriptor[], roots: string[], maxDepth = 6): Promise<ModelCandidate[]> {
   const normalizedRoots = await normalizeModelRoots(roots);
-  const paths = (await Promise.all(normalizedRoots.map(async root => walkForGguf(root, maxDepth)))).flat();
+  const paths = (await Promise.all(normalizedRoots.map(async root => walkForModels(root, maxDepth)))).flat();
   const uniquePaths = [...new Set(await Promise.all(paths.map(async path => {
     try {
       return await realpath(path);
@@ -247,21 +264,22 @@ export async function discoverModels(profiles: ProfileDescriptor[], roots: strin
     const name = basename(path);
     pathsByName.set(name, [...(pathsByName.get(name) ?? []), path]);
   }
-  const profileByName = new Map(profiles.map(profile => [profile.shards[0]?.name, profile]));
-  const modelPaths = uniquePaths.filter(path => profileByName.has(basename(path)));
-  const profiledCandidates = await Promise.all(modelPaths.map(async path => {
-    const profile = profileByName.get(basename(path));
-    if (!profile) {
-      return undefined;
-    }
-    const draftName = profile.draft?.[0]?.name;
-    const draftPaths = draftName ? pathsByName.get(draftName) ?? [] : [];
-    const sameDirectoryDraft = draftPaths.find(draftPath => resolve(draftPath, '..') === resolve(path, '..'));
-    const explicitDraft = sameDirectoryDraft ?? draftPaths[0];
-    return candidateFromModelPath(profile, path, explicitDraft);
+  const profiledCandidates = await Promise.all(profiles.flatMap(profile => {
+    const firstShard = profile.shards[0];
+    if (!firstShard) return [];
+    return (pathsByName.get(firstShard.name) ?? []).map(async path => {
+      if (profile.model.format === 'mlx' && !(await matchesMlxProfileAnchor(path, firstShard))) {
+        return undefined;
+      }
+      const draftName = profile.draft?.[0]?.name;
+      const draftPaths = draftName ? pathsByName.get(draftName) ?? [] : [];
+      const sameDirectoryDraft = draftPaths.find(draftPath => resolve(draftPath, '..') === resolve(path, '..'));
+      const explicitDraft = sameDirectoryDraft ?? draftPaths[0];
+      return candidateFromModelPath(profile, profile.model.format === 'mlx' ? resolve(path, '..') : path, explicitDraft);
+    });
   }));
   const knownProfileFiles = new Set(profiles.flatMap(profile => [...profile.shards, ...(profile.draft ?? [])].map(shard => shard.name)));
-  const genericCandidates = await Promise.all(uniquePaths.filter(path => !knownProfileFiles.has(basename(path)) && isGenericPrimaryModel(path)).map(path => genericCandidateFromModelPath(path, uniquePaths)));
+  const genericCandidates = await Promise.all(uniquePaths.filter(path => path.toLowerCase().endsWith('.gguf') && !knownProfileFiles.has(basename(path)) && isGenericPrimaryModel(path)).map(path => genericCandidateFromModelPath(path, uniquePaths)));
   return [...profiledCandidates, ...genericCandidates].filter((candidate): candidate is ModelCandidate => Boolean(candidate)).sort((left, right) => {
     if (left.kind !== right.kind) return left.kind === 'profiled' ? -1 : 1;
     const byModel = left.profile.model.name.localeCompare(right.profile.model.name);

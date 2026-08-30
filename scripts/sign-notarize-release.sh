@@ -64,7 +64,13 @@ PAYLOAD=$(find "$EXTRACT_ROOT" -mindepth 1 -maxdepth 1 -type d -print)
 
 MANIFEST="$PAYLOAD/share/tess-server/manifest.json"
 SERVER="$PAYLOAD/bin/tess-server"
-[ -f "$MANIFEST" ] && [ -x "$SERVER" ] || { echo "payload is incomplete" >&2; exit 1; }
+UPSTREAM_SERVER="$PAYLOAD/bin/upstream/tess-server"
+MLX_SERVER="$PAYLOAD/bin/mlx/tess-mlx-server"
+MLX_LIBRARY="$PAYLOAD/bin/mlx/libmlx.dylib"
+MLX_JACCL="$PAYLOAD/bin/mlx/libjaccl.dylib"
+MLX_MANIFEST="$PAYLOAD/share/tess-server/mlx/tess-mlx-manifest.json"
+[ -f "$MANIFEST" ] && [ -x "$SERVER" ] && [ -x "$UPSTREAM_SERVER" ] && [ -x "$MLX_SERVER" ] && \
+  [ -f "$MLX_LIBRARY" ] && [ -f "$MLX_JACCL" ] && [ -f "$MLX_MANIFEST" ] || { echo "payload is incomplete" >&2; exit 1; }
 PRODUCT=$(plutil -extract product raw -o - "$MANIFEST")
 VERSION=$(plutil -extract version raw -o - "$MANIFEST")
 BUILD_ID=$(plutil -extract build_id raw -o - "$MANIFEST")
@@ -90,8 +96,18 @@ WORK_PUBLIC="$OUTPUT_ROOT/not-yet-publishable"
 
 DMG_NAME="tess-server-$VERSION-macos-arm64.dmg"
 PRE_SIGN_SHA=$(shasum -a 256 "$SERVER" | awk '{print $1}')
-codesign --force --options runtime --timestamp --sign "$IDENTITY" "$SERVER"
-codesign --verify --strict --verbose=2 "$SERVER"
+UPSTREAM_PRE_SIGN_SHA=$(shasum -a 256 "$UPSTREAM_SERVER" | awk '{print $1}')
+MLX_SERVER_PRE_SIGN_SHA=$(shasum -a 256 "$MLX_SERVER" | awk '{print $1}')
+MLX_LIBRARY_PRE_SIGN_SHA=$(shasum -a 256 "$MLX_LIBRARY" | awk '{print $1}')
+MLX_JACCL_PRE_SIGN_SHA=$(shasum -a 256 "$MLX_JACCL" | awk '{print $1}')
+
+# Sign inner dynamic libraries before the executables that load them. Every
+# executable code object in the distribution receives the hardened runtime and
+# secure timestamp; notarization must never depend on a nested ad-hoc signature.
+for code in "$MLX_JACCL" "$MLX_LIBRARY" "$MLX_SERVER" "$UPSTREAM_SERVER" "$SERVER"; do
+  codesign --force --options runtime --timestamp --sign "$IDENTITY" "$code"
+  codesign --verify --strict --verbose=2 "$code"
+done
 codesign -dvvv "$SERVER" > "$OUTPUT_ROOT/private/binary-codesign.txt" 2>&1
 grep -q '(runtime)' "$OUTPUT_ROOT/private/binary-codesign.txt" || { echo "signed binary lacks hardened-runtime flag" >&2; exit 1; }
 grep -q '^Timestamp=' "$OUTPUT_ROOT/private/binary-codesign.txt" || { echo "signed binary lacks a secure timestamp" >&2; exit 1; }
@@ -101,28 +117,92 @@ if grep -q 'get-task-allow' "$OUTPUT_ROOT/private/binary-entitlements.plist"; th
   exit 1
 fi
 POST_SIGN_SHA=$(shasum -a 256 "$SERVER" | awk '{print $1}')
+UPSTREAM_POST_SIGN_SHA=$(shasum -a 256 "$UPSTREAM_SERVER" | awk '{print $1}')
+MLX_SERVER_POST_SIGN_SHA=$(shasum -a 256 "$MLX_SERVER" | awk '{print $1}')
+MLX_LIBRARY_POST_SIGN_SHA=$(shasum -a 256 "$MLX_LIBRARY" | awk '{print $1}')
+MLX_JACCL_POST_SIGN_SHA=$(shasum -a 256 "$MLX_JACCL" | awk '{print $1}')
 TEAM_ID=$(awk -F= '$1 == "TeamIdentifier" {print $2; exit}' "$OUTPUT_ROOT/private/binary-codesign.txt")
 AUTHORITY=$(awk -F= '$1 == "Authority" {print $2; exit}' "$OUTPUT_ROOT/private/binary-codesign.txt")
 [ -n "$TEAM_ID" ] && [ -n "$AUTHORITY" ] || { echo "signed binary lacks Developer ID authority metadata" >&2; exit 1; }
 
-python3 - "$MANIFEST" "$PRE_SIGN_SHA" "$POST_SIGN_SHA" "$TEAM_ID" "$AUTHORITY" "$DMG_NAME" <<'PY'
-import json, os, sys
-path, pre_sha, post_sha, team_id, authority, dmg_name = sys.argv[1:]
+python3 - "$PAYLOAD" "$MANIFEST" "$MLX_MANIFEST" "$TEAM_ID" "$AUTHORITY" "$DMG_NAME" \
+  "$PRE_SIGN_SHA" "$POST_SIGN_SHA" \
+  "$UPSTREAM_PRE_SIGN_SHA" "$UPSTREAM_POST_SIGN_SHA" \
+  "$MLX_SERVER_PRE_SIGN_SHA" "$MLX_SERVER_POST_SIGN_SHA" \
+  "$MLX_LIBRARY_PRE_SIGN_SHA" "$MLX_LIBRARY_POST_SIGN_SHA" \
+  "$MLX_JACCL_PRE_SIGN_SHA" "$MLX_JACCL_POST_SIGN_SHA" <<'PY'
+import hashlib, json, os, sys
+(payload, path, tess_mlx_path, team_id, authority, dmg_name,
+ primary_pre, primary_post, upstream_pre, upstream_post,
+ mlx_server_pre, mlx_server_post, mlx_pre, mlx_post,
+ jaccl_pre, jaccl_post) = sys.argv[1:]
 with open(path, encoding="utf-8") as handle:
     manifest = json.load(handle)
-row = manifest["files"]["bin/tess-server"]
-if row["sha256"] != pre_sha:
-    raise SystemExit("unsigned binary hash no longer matches staged manifest")
-row["sha256"] = post_sha
-row["bytes"] = os.path.getsize(os.path.join(os.path.dirname(path), "..", "..", "bin", "tess-server"))
+code_rows = {
+    "bin/tess-server": (primary_pre, primary_post),
+    "bin/upstream/tess-server": (upstream_pre, upstream_post),
+    "bin/mlx/tess-mlx-server": (mlx_server_pre, mlx_server_post),
+    "bin/mlx/libmlx.dylib": (mlx_pre, mlx_post),
+    "bin/mlx/libjaccl.dylib": (jaccl_pre, jaccl_post),
+}
+for relative, (pre_sha, post_sha) in code_rows.items():
+    row = manifest["files"][relative]
+    if row["sha256"] != pre_sha:
+        raise SystemExit(f"unsigned code hash no longer matches staged manifest: {relative}")
+    row["sha256"] = post_sha
+    row["bytes"] = os.path.getsize(os.path.join(payload, relative))
+manifest["engine_variants"]["primary"]["binary_sha256"] = primary_post
+manifest["engine_variants"]["upstream"]["binary_sha256"] = upstream_post
+manifest["tess_mlx"]["binary_sha256"] = mlx_server_post
+manifest["tess_mlx"]["libmlx_sha256"] = mlx_post
+manifest["tess_mlx"]["libjaccl_sha256"] = jaccl_post
+
+with open(tess_mlx_path, encoding="utf-8") as handle:
+    tess_mlx = json.load(handle)
+for relative, post_sha in {
+    "bin/mlx/tess-mlx-server": mlx_server_post,
+    "bin/mlx/libmlx.dylib": mlx_post,
+    "bin/mlx/libjaccl.dylib": jaccl_post,
+}.items():
+    tess_mlx["files"][relative]["sha256"] = post_sha
+    tess_mlx["files"][relative]["bytes"] = os.path.getsize(os.path.join(payload, relative))
+tess_mlx["signing"] = {
+    "identity_authority": authority,
+    "team_id": team_id,
+    "hardened_runtime": True,
+    "secure_timestamp": True,
+}
+with open(tess_mlx_path, "w", encoding="utf-8") as handle:
+    json.dump(tess_mlx, handle, indent=2, sort_keys=True)
+    handle.write("\n")
+with open(tess_mlx_path, "rb") as handle:
+    tess_mlx_sha = hashlib.file_digest(handle, "sha256").hexdigest()
+tess_mlx_relative = "share/tess-server/mlx/tess-mlx-manifest.json"
+manifest["files"][tess_mlx_relative] = {
+    "sha256": tess_mlx_sha,
+    "bytes": os.path.getsize(tess_mlx_path),
+}
 manifest["signing"] = {
+    # Preserve the established install-time primary-binary contract while the
+    # complete code map attests every nested executable and dylib.
     "binary": {
         "identity_authority": authority,
         "team_id": team_id,
         "hardened_runtime": True,
         "secure_timestamp": True,
-        "pre_sign_sha256": pre_sha,
-        "post_sign_sha256": post_sha,
+        "pre_sign_sha256": primary_pre,
+        "post_sign_sha256": primary_post,
+    },
+    "code": {
+        relative: {
+            "identity_authority": authority,
+            "team_id": team_id,
+            "hardened_runtime": True,
+            "secure_timestamp": True,
+            "pre_sign_sha256": pre_sha,
+            "post_sign_sha256": post_sha,
+        }
+        for relative, (pre_sha, post_sha) in code_rows.items()
     },
     "container": {"format": "dmg", "notarization": "performed after image construction"},
 }
@@ -172,6 +252,17 @@ COPY_VERSION=$("$SPACE_COPY/bin/tess-server" --version-json | plutil -extract ve
 [ "$COPY_VERSION" = "$VERSION" ] || { echo "relocated signed payload version mismatch" >&2; exit 1; }
 codesign --verify --strict --verbose=2 "$SPACE_COPY/bin/tess-server"
 spctl --assess --type execute --verbose=2 "$SPACE_COPY/bin/tess-server"
+for code in \
+  "$SPACE_COPY/bin/upstream/tess-server" \
+  "$SPACE_COPY/bin/mlx/libjaccl.dylib" \
+  "$SPACE_COPY/bin/mlx/libmlx.dylib" \
+  "$SPACE_COPY/bin/mlx/tess-mlx-server"; do
+  codesign --verify --strict --verbose=2 "$code"
+done
+MLX_COPY_VERSION=$("$SPACE_COPY/bin/mlx/tess-mlx-server" --version-json | plutil -extract version raw -o - -)
+[ "$MLX_COPY_VERSION" = "$VERSION" ] || { echo "relocated Tess MLX server version mismatch" >&2; exit 1; }
+spctl --assess --type execute --verbose=2 "$SPACE_COPY/bin/upstream/tess-server"
+spctl --assess --type execute --verbose=2 "$SPACE_COPY/bin/mlx/tess-mlx-server"
 hdiutil detach "$MOUNT_POINT" >/dev/null
 MOUNTED=0
 

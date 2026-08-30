@@ -2,7 +2,7 @@
   "profile_id": "inkling-small-iq3xxs",
   "schema_version": 2,
   "engine": {
-    "min_version": "0.1.5",
+    "min_version": "0.1.6",
     "max_version": null
   },
   "model": {

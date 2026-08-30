@@ -1,0 +1,83 @@
+{
+  "profile_id": "dsv4-0731-mlx-24mixed",
+  "schema_version": 2,
+  "engine": {
+    "min_version": "0.1.6",
+    "max_version": null
+  },
+  "model": {
+    "name": "DeepSeek-V4-Flash-0731 MLX",
+    "architecture": "deepseek_v4",
+    "quant_label": "2.4-bit mixed MLX",
+    "total_params": "284B",
+    "active_params": "13B",
+    "format": "mlx"
+  },
+  "shards": [
+    {"name": "model.safetensors.index.json", "bytes": 216972, "sha256": "f1332b2b209769c2db335954c2651652a8048e7d7dbf60296c2f2c0198715861"},
+    {"name": "config.json", "bytes": 126726, "sha256": "44735712733fcf8f299bdf1faa1d87fac88f1917efe1d3876d6d4c582f79a68f"},
+    {"name": "generation_config.json", "bytes": 170, "sha256": "5fccff80f55a4d455bbe516bdd552edf3e9623df95e99fbf2a3c3389fdf91af0"},
+    {"name": "tokenizer.json", "bytes": 6367146, "sha256": "8f9f37ca37fdc4f5fd36d5cf4d3b0e8392edb4e894fd10cc0d70b4957c8633cf"},
+    {"name": "tokenizer_config.json", "bytes": 801, "sha256": "6ac8c8dc065ed118161d02dd532749ae3f52c243deac27872134fae2f50d8547"},
+    {"name": "model-00001-of-00018.safetensors", "bytes": 3956262156, "sha256": "25fa95fe9ad4623e51662af5e963d95bc2f983ba3bcd883a5e891b184063c895"},
+    {"name": "model-00002-of-00018.safetensors", "bytes": 4922284839, "sha256": "94da15caf6d45dfba6de48d7e84b5c5b8b9528226dcd98c1a24e6ebadbf791be"},
+    {"name": "model-00003-of-00018.safetensors", "bytes": 5435821413, "sha256": "b896348a3d6142d3566bda24d43193809ef8ed98a36d05a177e851f36d4204d3"},
+    {"name": "model-00004-of-00018.safetensors", "bytes": 5435821421, "sha256": "0a55451c72dcd6f3d84f6969e905ab10fd21e01f02f8b4c6a9c7a5b5d7ccec9c"},
+    {"name": "model-00005-of-00018.safetensors", "bytes": 5435821423, "sha256": "76488d6d8ab51522aafc773825eba76d93332de3c9005d3c2fe6fd8d44cf0602"},
+    {"name": "model-00006-of-00018.safetensors", "bytes": 5435821442, "sha256": "5d60b0dbac08f495d4571f8d192ec0d58c5c34e99911c588f61b027b04da6e1e"},
+    {"name": "model-00007-of-00018.safetensors", "bytes": 5435821448, "sha256": "6748e0c786aa678803072f97cb2279eb99da9bdc0f3067360c0c194226a74840"},
+    {"name": "model-00008-of-00018.safetensors", "bytes": 5435821450, "sha256": "91f23157b1f5570ffec949d36078acdc78f0fb6b9d396b60702f5456c42c8e8f"},
+    {"name": "model-00009-of-00018.safetensors", "bytes": 5435821448, "sha256": "122d4728f119bd8da076b83a0c34c3e5bf0cb999d2187256079bb951b113ff91"},
+    {"name": "model-00010-of-00018.safetensors", "bytes": 5435821442, "sha256": "47f10422c1b22af6ccc855c127d140ba77fde023473c9e30d3cc1fdfa94ca73a"},
+    {"name": "model-00011-of-00018.safetensors", "bytes": 5435821446, "sha256": "c5ef2f9eb6d7b7a75da2d810cb2f1836c5c07b633ecb58ed8f30515d03f8147e"},
+    {"name": "model-00012-of-00018.safetensors", "bytes": 5435821448, "sha256": "2aa697cf8bfb9971077d7310faa0dd570dd82d5a3b6566aed168f56c7a5ab2b4"},
+    {"name": "model-00013-of-00018.safetensors", "bytes": 5435821448, "sha256": "8e9438368fc3e8be5fba7353eb0831f025c6b9584578e33964ec0c445c68042f"},
+    {"name": "model-00014-of-00018.safetensors", "bytes": 5435821446, "sha256": "46caaa32cc34f96b104f1ead6be8eb62efdb1300a2e4bb38bd799675fbea33fe"},
+    {"name": "model-00015-of-00018.safetensors", "bytes": 5435821448, "sha256": "4844258126308afe3fc519865cd868ede29bd323a4703ec27a05ec2e5aa98bd2"},
+    {"name": "model-00016-of-00018.safetensors", "bytes": 5435821448, "sha256": "82c8d797b67698528852e1d1073ef26cc6e2fa27e85eb2be03956eb19360e9fb"},
+    {"name": "model-00017-of-00018.safetensors", "bytes": 4362077950, "sha256": "77e492dfc5bb9e2cb6d418d3c75d4995c0bccb2623f6fd956e8fc9a5d20e0d14"},
+    {"name": "model-00018-of-00018.safetensors", "bytes": 3489662348, "sha256": "579e08970fe4f5802bea6ff748a5e95615d5d00c57305856e1fd222c6613ff45"}
+  ],
+  "draft": null,
+  "context": {
+    "trained": 1048576,
+    "engine_allocatable": 32768,
+    "validated": 32768,
+    "qualified": 32768,
+    "validated_prompt": 32768,
+    "validated_generation": 256,
+    "default": 8192
+  },
+  "runtime": {
+    "batch": 1,
+    "ubatch": 1,
+    "kv_type": "tess-mlx",
+    "slots": 1,
+    "flash_attention": true,
+    "jinja": true
+  },
+  "speculation": null,
+  "memory": {
+    "ram_class_gib": 128,
+    "wired_limit_note": "Tess MLX temporarily requests MLX's public recommended wired-memory working set while the resident runtime is alive; no sudo or persistent system setting is required."
+  },
+  "evidence": [
+    "20260830-M1d-r22-qualified-parity-result",
+    "20260830-M1d-r22-toolchain-build-test-result",
+    "20260830-M1d-r23-tess-mlx-server-productization"
+  ],
+  "limitations": [
+    "This profile matches mlx-community/DeepSeek-V4-Flash-0731-2.4bit-mixed at revision 10001e0065f8394e03e968e652cbbe7cd2ca122c only.",
+    "The 4K, 8K, 16K, and 32K presets are qualified on a 128 GiB M4 Max; larger contexts are not exposed in this release.",
+    "This first Tess MLX release is target-only. The unpublished Python/oMLX DSpark path is not bundled, exposed, or claimed.",
+    "The MLX profile is single-slot, loopback-only, and macOS arm64 only."
+  ],
+  "expert": {
+    "context_presets": [
+      {"tokens": 4096, "label": "4K", "group": "Qualified", "ubatch": 1},
+      {"tokens": 8192, "label": "8K", "group": "Qualified", "recommended": true, "ubatch": 1},
+      {"tokens": 16384, "label": "16K", "group": "Qualified", "ubatch": 1},
+      {"tokens": 32768, "label": "32K", "group": "Qualified", "ubatch": 1}
+    ]
+  }
+}
