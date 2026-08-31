@@ -37,7 +37,11 @@ test('keeps every configured context selectable and warns instead of blocking un
         && !preset.experimental
         && preset.tokens <= (candidate.context.qualified ?? candidate.context.default);
       if (!qualified) {
-        assert.match(resolved.warnings.join('\n'), /Launch is allowed/, `${candidate.profile_id} ${preset.label} should warn`);
+        if (candidate.context.presentation === 'plain') {
+          assert.match(resolved.warnings.join('\n'), /consume more memory/, `${candidate.profile_id} ${preset.label} should warn about memory`);
+        } else {
+          assert.match(resolved.warnings.join('\n'), /Launch is allowed/, `${candidate.profile_id} ${preset.label} should warn`);
+        }
       }
     }
   }
@@ -73,6 +77,14 @@ test('keeps every configured context selectable and warns instead of blocking un
   const dsv40731Extended = resolveProfileConfiguration(profile('dsv4-0731-dspark'), {context: 524288});
   assert.equal(dsv40731Extended.speculation, 'dspark');
   assert.equal(dsv40731Extended.runtimeLabel, 'custom');
+  const tessMlx1m = resolveProfileConfiguration(profile('dsv4-0731-mlx-24mixed'), {context: 1048576});
+  assert.equal(tessMlx1m.startable, true);
+  assert.equal(tessMlx1m.runtimeLabel, 'custom');
+  assert.deepEqual(tessMlx1m.warnings, ['Larger contexts consume more memory and may not fit on every Mac.']);
+  assert.throws(
+    () => resolveProfileConfiguration(profile('dsv4-0731-mlx-24mixed'), {context: 16384}),
+    /not available.*32,768.*1,048,576/,
+  );
   const inkling32k = resolveProfileConfiguration(profile('inkling-small-iq3xxs'), {context: 32768});
   assert.equal(inkling32k.startable, true);
   assert.equal(inkling32k.runtimeLabel, 'custom');

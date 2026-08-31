@@ -28,6 +28,7 @@ export interface ProfileContext {
   qualified?: number;
   validated_prompt?: number;
   validated_generation?: number;
+  presentation?: 'plain';
 }
 
 export type PresetAvailability = 'available' | 'qualification-pending';

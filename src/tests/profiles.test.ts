@@ -78,8 +78,18 @@ test('loads all eleven source profiles with launcher mappings', async () => {
   assert.equal(dsv4Mlx?.shards.length, 23);
   assert.equal(dsv4Mlx?.draft, null);
   assert.equal(dsv4Mlx?.context.default, 32768);
+  assert.equal(dsv4Mlx?.context.engine_allocatable, 1048576);
   assert.equal(dsv4Mlx?.context.qualified, 32768);
   assert.equal(dsv4Mlx?.expert.context_presets.find(preset => preset.recommended)?.tokens, 32768);
+  assert.deepEqual(dsv4Mlx?.expert.context_presets.map(preset => preset.tokens), [
+    32768, 65536, 131072, 262144, 524288, 1048576,
+  ]);
+  assert.deepEqual(dsv4Mlx?.expert.context_presets.map(preset => preset.label), [
+    '32K', '64K', '128K', '256K', '512K', '1M',
+  ]);
+  assert.ok(dsv4Mlx?.expert.context_presets.every(preset => preset.group === undefined));
+  assert.ok(dsv4Mlx?.expert.context_presets.every(preset => preset.experimental === undefined));
+  assert.ok(dsv4Mlx?.expert.context_presets.every(preset => preset.availability === undefined));
   assert.equal(dsv4Mlx?.speculation, null);
   assert.equal(dsv4Mlx?.expert.speculation, undefined);
 });

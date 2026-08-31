@@ -41,12 +41,13 @@
   "draft": null,
   "context": {
     "trained": 1048576,
-    "engine_allocatable": 32768,
+    "engine_allocatable": 1048576,
     "validated": 32768,
     "qualified": 32768,
     "validated_prompt": 32768,
     "validated_generation": 256,
-    "default": 32768
+    "default": 32768,
+    "presentation": "plain"
   },
   "runtime": {
     "batch": 1,
@@ -68,16 +69,18 @@
   ],
   "limitations": [
     "This profile matches mlx-community/DeepSeek-V4-Flash-0731-2.4bit-mixed at revision 10001e0065f8394e03e968e652cbbe7cd2ca122c only.",
-    "The 4K, 8K, 16K, and 32K presets are qualified on a 128 GiB M4 Max; larger contexts are not exposed in this release.",
+    "Available context choices are 32K, 64K, 128K, 256K, 512K, and 1M. Larger contexts consume more memory and may not fit on every Mac.",
     "This first Tess MLX release is target-only. The unpublished Python/oMLX DSpark path is not bundled, exposed, or claimed.",
     "The MLX profile is single-slot, loopback-only, and macOS arm64 only."
   ],
   "expert": {
     "context_presets": [
-      {"tokens": 4096, "label": "4K", "group": "Qualified", "ubatch": 1},
-      {"tokens": 8192, "label": "8K", "group": "Qualified", "ubatch": 1},
-      {"tokens": 16384, "label": "16K", "group": "Qualified", "ubatch": 1},
-      {"tokens": 32768, "label": "32K", "group": "Qualified", "recommended": true, "ubatch": 1}
+      {"tokens": 32768, "label": "32K", "recommended": true, "ubatch": 1},
+      {"tokens": 65536, "label": "64K", "ubatch": 1},
+      {"tokens": 131072, "label": "128K", "ubatch": 1},
+      {"tokens": 262144, "label": "256K", "ubatch": 1},
+      {"tokens": 524288, "label": "512K", "ubatch": 1},
+      {"tokens": 1048576, "label": "1M", "ubatch": 1}
     ]
   }
 }

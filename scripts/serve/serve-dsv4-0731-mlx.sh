@@ -7,11 +7,11 @@ tess_reject_unmodeled_tuning_env
 tess_validate_server_settings
 
 MODEL=${MODEL:?path to the DeepSeek-V4-Flash-0731 MLX model directory}
-CTX=${CTX:-8192}
+CTX=${CTX:-32768}
 tess_require_uint CTX "$CTX"
 case "$CTX" in
-  4096|8192|16384|32768) ;;
-  *) tess_die "unsupported DeepSeek MLX context; choose 4096, 8192, 16384, or 32768" ;;
+  32768|65536|131072|262144|524288|1048576) ;;
+  *) tess_die "unsupported DeepSeek MLX context; choose 32768, 65536, 131072, 262144, 524288, or 1048576" ;;
 esac
 
 tess_profile_begin_mlx dsv4-0731-mlx-24mixed

@@ -86,6 +86,7 @@ export function resolveProfileConfiguration(profile: ProfileDescriptor, override
   let startable = true;
   let rejection: string | undefined;
   const qualificationPending = preset.availability === 'qualification-pending';
+  const plainContextChoices = profile.context.presentation === 'plain';
 
   const qualifiedCeiling = profile.context.qualified ?? profile.context.default;
   const qualifiedPreset = (
@@ -93,15 +94,18 @@ export function resolveProfileConfiguration(profile: ProfileDescriptor, override
     && !preset.experimental
     && context <= qualifiedCeiling
   );
-  if (context !== profile.context.default && !qualifiedPreset) {
+  if (plainContextChoices && context !== profile.context.default) {
+    deltas.push(`context=${context} (default ${profile.context.default})`);
+    warnings.push('Larger contexts consume more memory and may not fit on every Mac.');
+  } else if (context !== profile.context.default && !qualifiedPreset) {
     deltas.push(`context=${context} (qualified ceiling ${qualifiedCeiling})`);
   }
-  if (qualificationPending) {
+  if (!plainContextChoices && qualificationPending) {
     const reason = preset.unavailable_reason ?? `${preset.label} has not been qualified`;
     warnings.push(`${reason}. Launch is allowed, but compatibility, memory, correctness, quality, and performance are not claimed for this context.`);
-  } else if (preset.experimental) {
+  } else if (!plainContextChoices && preset.experimental) {
     warnings.push(`${preset.label} is experimental and has not been qualified. Launch is allowed, but compatibility, memory, correctness, quality, and performance are not claimed for this context.`);
-  } else if (context > qualifiedCeiling) {
+  } else if (!plainContextChoices && context > qualifiedCeiling) {
     warnings.push(`${preset.label} exceeds the profile's qualified ${qualifiedCeiling.toLocaleString()}-token ceiling. Launch is allowed, but compatibility, memory, correctness, quality, and performance are not claimed for this context.`);
   }
 
