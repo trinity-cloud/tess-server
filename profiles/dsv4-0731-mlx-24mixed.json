@@ -46,7 +46,7 @@
     "qualified": 32768,
     "validated_prompt": 32768,
     "validated_generation": 256,
-    "default": 8192
+    "default": 32768
   },
   "runtime": {
     "batch": 1,
@@ -75,9 +75,9 @@
   "expert": {
     "context_presets": [
       {"tokens": 4096, "label": "4K", "group": "Qualified", "ubatch": 1},
-      {"tokens": 8192, "label": "8K", "group": "Qualified", "recommended": true, "ubatch": 1},
+      {"tokens": 8192, "label": "8K", "group": "Qualified", "ubatch": 1},
       {"tokens": 16384, "label": "16K", "group": "Qualified", "ubatch": 1},
-      {"tokens": 32768, "label": "32K", "group": "Qualified", "ubatch": 1}
+      {"tokens": 32768, "label": "32K", "group": "Qualified", "recommended": true, "ubatch": 1}
     ]
   }
 }

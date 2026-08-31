@@ -8,6 +8,8 @@ function positive(value: unknown, field: string): number {
 export function parseRuntimeCapabilities(value: unknown): RuntimeCapabilities {
   if (!value || typeof value !== 'object') throw new Error('runtime capabilities must be an object');
   const input = value as Record<string, unknown>;
+  const defaults = input.default_generation_settings && typeof input.default_generation_settings === 'object'
+    ? input.default_generation_settings as Record<string, unknown> : {};
   const runtime = input.runtime;
   if (runtime !== 'tess-mlx' && runtime !== 'gguf') throw new Error('invalid runtime capability: runtime');
   const features = input.features && typeof input.features === 'object'
@@ -16,9 +18,9 @@ export function parseRuntimeCapabilities(value: unknown): RuntimeCapabilities {
     schemaVersion: 1,
     runtime,
     model: typeof input.model === 'string' ? input.model : 'local-llama-server',
-    contextWindow: positive(input.context_window ?? input.n_ctx, 'context_window'),
-    maxOutputTokens: positive(input.max_output_tokens ?? input.context_window ?? input.n_ctx, 'max_output_tokens'),
-    slots: positive(input.slots ?? input.n_slots ?? 1, 'slots'),
+    contextWindow: positive(input.context_window ?? input.n_ctx ?? defaults.n_ctx, 'context_window'),
+    maxOutputTokens: positive(input.max_output_tokens ?? input.context_window ?? input.n_ctx ?? defaults.n_ctx, 'max_output_tokens'),
+    slots: positive(input.slots ?? input.n_slots ?? input.total_slots ?? 1, 'slots'),
     speculation: typeof input.speculation === 'string' ? input.speculation : 'unknown',
     features: {
       chatCompletions: features.chat_completions !== false,

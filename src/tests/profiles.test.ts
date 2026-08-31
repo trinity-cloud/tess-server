@@ -77,7 +77,9 @@ test('loads all eleven source profiles with launcher mappings', async () => {
   assert.equal(dsv4Mlx?.model.format, 'mlx');
   assert.equal(dsv4Mlx?.shards.length, 23);
   assert.equal(dsv4Mlx?.draft, null);
+  assert.equal(dsv4Mlx?.context.default, 32768);
   assert.equal(dsv4Mlx?.context.qualified, 32768);
+  assert.equal(dsv4Mlx?.expert.context_presets.find(preset => preset.recommended)?.tokens, 32768);
   assert.equal(dsv4Mlx?.speculation, null);
   assert.equal(dsv4Mlx?.expert.speculation, undefined);
 });

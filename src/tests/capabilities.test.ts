@@ -21,6 +21,23 @@ test('derives request budgets from the active runtime instead of a global alias'
   assert.ok(ggufBudget.compactionThresholdTokens > mlxBudget.compactionThresholdTokens);
 });
 
+test('parses the real llama.cpp props capability shape', () => {
+  assert.deepEqual(parseRuntimeCapabilities({
+    runtime: 'gguf',
+    default_generation_settings: {n_ctx: 131072},
+    total_slots: 1,
+  }), {
+    schemaVersion: 1,
+    runtime: 'gguf',
+    model: 'local-llama-server',
+    contextWindow: 131072,
+    maxOutputTokens: 131072,
+    slots: 1,
+    speculation: 'unknown',
+    features: {chatCompletions: true, streaming: true, tools: true, reasoning: true},
+  });
+});
+
 test('rejects malformed capability records', () => {
   assert.throws(() => parseRuntimeCapabilities({runtime: 'python', context_window: 1}), /runtime/);
   assert.throws(() => parseRuntimeCapabilities({runtime: 'gguf', context_window: 0}), /context_window/);
