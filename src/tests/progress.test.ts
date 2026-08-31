@@ -1,6 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {coarseProgressFromLog, parseProgressLine, progressLabel, ProgressLineDecoder} from '../progress.js';
+import {
+  coarseProgressFromLog,
+  parseProgressLine,
+  progressLabel,
+  progressLogLine,
+  ProgressLineDecoder,
+} from '../progress.js';
 
 test('decodes fragmented structured progress without exposing it as a log', () => {
   const decoder = new ProgressLineDecoder();
@@ -11,6 +17,7 @@ test('decodes fragmented structured progress without exposing it as a log', () =
   assert.equal(event?.phase, 'loading_weights');
   assert.equal(event?.completed, 2);
   assert.equal(event?.current, 'shard 2');
+  assert.equal(progressLogLine(event!), '[1s] Loading weights · shard 2 · 2/18');
   assert.deepEqual(decoder.finish(), ['next']);
 });
 

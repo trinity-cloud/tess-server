@@ -22,7 +22,13 @@ import {
   upsertLibraryEntry,
 } from '../library.js';
 import {formatBytes, formatTokens} from '../profiles.js';
-import {coarseProgressFromLog, parseProgressLine, progressLabel, ProgressLineDecoder} from '../progress.js';
+import {
+  coarseProgressFromLog,
+  parseProgressLine,
+  progressLabel,
+  progressLogLine,
+  ProgressLineDecoder,
+} from '../progress.js';
 import {
   assertAuthKeyFile,
   assertPortAvailable,
@@ -200,6 +206,8 @@ export function App({
   const [clock, setClock] = useState(() => Date.now());
   const childRef = useRef<ChildProcess | undefined>(undefined);
   const stopTimerRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const forceStopTimerRef = useRef<NodeJS.Timeout | undefined>(undefined);
+  const exitAfterStopRef = useRef(false);
   const downloadAbortRef = useRef<AbortController | undefined>(undefined);
   const progressSequenceRef = useRef(0);
   const processStartedAtRef = useRef(0);
@@ -332,26 +340,48 @@ export function App({
       if (structured) {
         setStartupProgress(current => !current || structured.sequence > current.sequence ? structured : current);
         progressSequenceRef.current = Math.max(progressSequenceRef.current, structured.sequence);
+        setLogs(current => [...current, progressLogLine(structured)].slice(-200));
       } else if (activeRuntimeRef.current === 'gguf') {
         const coarse = coarseProgressFromLog(line, ++progressSequenceRef.current, processStartedAtRef.current);
         if (coarse) setStartupProgress(coarse);
       }
-      if (!line.includes('TESS_PROGRESS ')) setLogs(current => [...current, line].slice(-200));
+      if (!structured) setLogs(current => [...current, line].slice(-200));
     }
   }, []);
 
+  const forceStopChild = useCallback(() => {
+    const child = childRef.current;
+    if (!child || child.exitCode !== null) {
+      if (exitAfterStopRef.current) exit();
+      return;
+    }
+    stopCaptured(child, 'SIGKILL');
+  }, [exit]);
+
   const stopChild = useCallback(() => {
     const child = childRef.current;
-    if (!child || child.exitCode !== null || child.killed) return;
+    exitAfterStopRef.current = true;
+    if (!child || child.exitCode !== null) {
+      exit();
+      return;
+    }
+    if (processStatus === 'stopping') {
+      forceStopChild();
+      return;
+    }
     setProcessStatus('stopping');
     stopCaptured(child, 'SIGINT');
     stopTimerRef.current = setTimeout(() => {
       if (child.exitCode === null) stopCaptured(child, 'SIGTERM');
-    }, 5000);
-  }, []);
+    }, 500);
+    forceStopTimerRef.current = setTimeout(() => {
+      if (child.exitCode === null) stopCaptured(child, 'SIGKILL');
+    }, 1500);
+  }, [exit, forceStopChild, processStatus]);
 
   useEffect(() => () => {
     if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
+    if (forceStopTimerRef.current) clearTimeout(forceStopTimerRef.current);
     const child = childRef.current;
     if (child && child.exitCode === null) stopCaptured(child, 'SIGTERM');
     downloadAbortRef.current?.abort();
@@ -368,7 +398,8 @@ export function App({
     setStartupProgress(undefined);
     setCapabilities(undefined);
     setLogs([]);
-    setShowLogs(false);
+    setShowLogs(true);
+    exitAfterStopRef.current = false;
     setView('process');
     progressSequenceRef.current = 0;
     processStartedAtRef.current = Date.now();
@@ -403,15 +434,17 @@ export function App({
           if (!line.includes('TESS_PROGRESS ')) setLogs(current => [...current, line].slice(-200));
         }
         if (stopTimerRef.current) clearTimeout(stopTimerRef.current);
+        if (forceStopTimerRef.current) clearTimeout(forceStopTimerRef.current);
         setProcessStatus(current => current === 'ready' && code === 0 ? 'exited' : code === 0 ? 'exited' : 'failed');
         setProcessExit(code === null ? `signal ${signal ?? 'unknown'}` : `exit ${code}`);
+        if (exitAfterStopRef.current) exit();
       });
     } catch (error) {
       setLogs([error instanceof Error ? error.message : String(error)]);
       setProcessStatus('failed');
       setProcessExit('preflight failed');
     }
-  }, [appendOutput, overrides, payloadRoot, resolved, selected, serverSettings]);
+  }, [appendOutput, exit, overrides, payloadRoot, resolved, selected, serverSettings]);
 
   useEffect(() => {
     if (view !== 'process' || processStatus !== 'starting' || processNonce === 0) return;
@@ -686,7 +719,7 @@ export function App({
         <Text bold dimColor>Logs</Text>
         {logs.slice(-12).map((line, index) => <Text key={`${index}:${line}`} wrap="truncate">{line}</Text>)}
       </Box>}
-      <Text><Key>l</Key> {showLogs ? 'Hide logs' : 'Show logs'}  <Key>q</Key> {processStatus === 'starting' || processStatus === 'ready' ? 'Stop' : 'Back'}</Text>
+      <Text><Key>l</Key> {showLogs ? 'Hide logs' : 'Show logs'}  <Key>q</Key> {processStatus === 'stopping' ? 'Force stop' : processStatus === 'starting' || processStatus === 'ready' ? 'Stop and quit' : 'Back'}</Text>
     </Box>;
   }
 

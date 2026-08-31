@@ -76,3 +76,11 @@ export function progressLabel(progress: StartupProgress | undefined, now = Date.
     : '';
   return `${progress.message}${detail}${count}${stale}`;
 }
+
+export function progressLogLine(progress: StartupProgress): string {
+  const elapsed = Math.max(0, Math.floor(progress.elapsedMs / 1000));
+  const detail = progress.current ? ` · ${progress.current}` : '';
+  const count = progress.total && progress.completed !== undefined
+    ? ` · ${progress.completed}/${progress.total}` : '';
+  return `[${elapsed}s] ${progress.message}${detail}${count}`;
+}
