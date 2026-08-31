@@ -6,16 +6,10 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Box, Text, useApp, useInput} from 'ink';
 import {chooseModelPath} from '../browse.js';
 import {fetchRuntimeCapabilities} from '../capabilities.js';
-import {catalogForHost, embeddedCatalog, hostMemoryGiB} from '../catalog.js';
+import {embeddedCatalog} from '../catalog.js';
 import {
-  genericBatchChoices,
-  genericContextChoices,
-  genericFlashAttentionChoices,
-  genericSlotChoices,
-  genericUbatchChoices,
   launchOverridesFromResolved,
   resolveProfileConfiguration,
-  resolveUnprofiledConfiguration,
 } from '../configuration.js';
 import {candidateFromAnyPath, discoverModels} from '../discovery.js';
 import {downloadCatalogEntry, type DownloadProgress} from '../download.js';
@@ -24,7 +18,6 @@ import {
   emptyLibrary,
   entryFromCandidate,
   loadModelLibrary,
-  removeLibraryEntry,
   saveModelLibrary,
   upsertLibraryEntry,
 } from '../library.js';
@@ -55,18 +48,15 @@ type View =
   | 'library'
   | 'manual-path'
   | 'details'
-  | 'advanced'
   | 'settings'
   | 'download-confirm'
   | 'downloading'
   | 'process';
 type ProcessStatus = 'starting' | 'ready' | 'stopping' | 'exited' | 'failed';
 type SettingsField = 'port' | 'alias' | 'auth' | 'key_file';
-type AdvancedField = 'context' | 'batch' | 'ubatch' | 'slots' | 'flash_attention';
 
 interface ModelRow {
   id: string;
-  section: 'Recommended' | 'My Models';
   runtime: RuntimeKind;
   title: string;
   description: string;
@@ -155,12 +145,10 @@ function settingValue(settings: ServerSettings, field: SettingsField): string {
   return settings.auth.mode === 'file' ? settings.auth.key_file ?? '' : '';
 }
 
-function resolvedFor(candidate: ModelCandidate | undefined, overrides: LaunchOverrides): ResolvedProfileConfiguration | undefined {
-  if (!candidate) return undefined;
+function resolvedFor(profile: ProfileDescriptor | undefined, overrides: LaunchOverrides): ResolvedProfileConfiguration | undefined {
+  if (!profile) return undefined;
   try {
-    return candidate.kind === 'profiled'
-      ? resolveProfileConfiguration(candidate.profile, overrides)
-      : resolveUnprofiledConfiguration(candidate, overrides);
+    return resolveProfileConfiguration(profile, overrides);
   } catch {
     return undefined;
   }
@@ -189,17 +177,14 @@ export function App({
 }: AppProps): React.JSX.Element {
   const {exit} = useApp();
   const [view, setView] = useState<View>('library');
-  const [runtime, setRuntime] = useState<RuntimeKind>('tess-mlx');
   const [library, setLibrary] = useState<ModelLibrary>(() => structuredClone(emptyLibrary));
   const [candidates, setCandidates] = useState<ModelCandidate[]>([]);
-  const [selectedByRuntime, setSelectedByRuntime] = useState<Record<RuntimeKind, number>>({'tess-mlx': 0, gguf: 0});
-  const [showOtherMacs, setShowOtherMacs] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [scanning, setScanning] = useState(true);
   const [message, setMessage] = useState('Loading your model library…');
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [manualPath, setManualPath] = useState('');
   const [modelOverrides, setModelOverrides] = useState<Record<string, LaunchOverrides>>({});
-  const [advancedIndex, setAdvancedIndex] = useState(0);
   const [serverSettings, setServerSettings] = useState(initialServerSettings);
   const [settingsIndex, setSettingsIndex] = useState(0);
   const [settingsInput, setSettingsInput] = useState<{field: SettingsField; value: string}>();
@@ -221,14 +206,11 @@ export function App({
   const activeRuntimeRef = useRef<RuntimeKind>('gguf');
   const authHeaderRef = useRef<Record<string, string>>({});
   const catalog = useMemo(() => embeddedCatalog(profiles), [profiles]);
-  const visibleCatalog = useMemo(
-    () => showOtherMacs ? catalog : catalogForHost(catalog),
-    [catalog, showOtherMacs],
-  );
 
   useEffect(() => {
     let active = true;
     const scan = async (): Promise<void> => {
+      const supportedProfiles = new Set(catalog.map(entry => entry.profileId));
       setScanning(true);
       try {
         const saved = await loadModelLibrary();
@@ -238,14 +220,16 @@ export function App({
         const savedCandidates = (await Promise.all(saved.entries.map(async entry => {
           try { return await candidateFromAnyPath(profiles, entry.path, entry.runtime); }
           catch { return undefined; }
-        }))).filter((candidate): candidate is ModelCandidate => Boolean(candidate));
+        }))).filter((candidate): candidate is ModelCandidate => Boolean(candidate))
+          .filter(candidate => supportedProfiles.has(candidate.profile.profile_id));
         if (active) setCandidates(uniqueCandidates(savedCandidates));
-        const discovered = await discoverModels(profiles, initialModelRoots);
+        const discovered = (await discoverModels(profiles, initialModelRoots))
+          .filter(candidate => supportedProfiles.has(candidate.profile.profile_id));
         if (!active) return;
         setCandidates(uniqueCandidates([...savedCandidates, ...discovered]));
         setMessage(discovered.length + savedCandidates.length > 0
-          ? 'Local models are ready. No network was contacted.'
-          : 'No local model found yet. Browse, add a path, or choose a download.');
+          ? 'Supported local models are ready. No network was contacted.'
+          : 'Choose a model to download or add its existing local path.');
       } catch (error) {
         if (active) setMessage(`Library needs attention: ${error instanceof Error ? error.message : String(error)}`);
       } finally {
@@ -254,100 +238,76 @@ export function App({
     };
     void scan();
     return () => { active = false; };
-  }, [initialModelRoots.join('\u0000'), profiles, refreshNonce]);
+  }, [catalog, initialModelRoots.join('\u0000'), profiles, refreshNonce]);
 
   const rows = useMemo<ModelRow[]>(() => {
-    const output: ModelRow[] = [];
-    const usedPaths = new Set<string>();
-    for (const entry of visibleCatalog.filter(item => item.runtime === runtime)) {
+    return catalog.map(entry => {
       const saved = library.entries.find(item => item.catalogId === entry.id);
       const local = candidates.find(candidate =>
         (saved && samePath(candidate.modelPath, saved.path)) || candidate.profile.profile_id === entry.profileId);
-      if (local) usedPaths.add(resolve(local.modelPath));
-      output.push({
+      return {
         id: `catalog:${entry.id}`,
-        section: 'Recommended',
-        runtime,
+        runtime: entry.runtime,
         title: entry.displayName,
         description: entry.description,
         status: local?.complete ? 'Ready' : local ? 'Needs attention' : 'Download',
         catalog: entry,
         ...(local ? {candidate: local} : {}),
         ...(saved ? {library: saved} : {}),
-      });
-    }
-    for (const saved of library.entries.filter(item => item.runtime === runtime && !item.catalogId)) {
-      const local = candidates.find(candidate => samePath(candidate.modelPath, saved.path));
-      if (local) usedPaths.add(resolve(local.modelPath));
-      output.push({
-        id: `library:${saved.id}`,
-        section: 'My Models',
-        runtime,
-        title: saved.displayName,
-        description: saved.path,
-        status: local?.complete ? 'Local' : 'Needs attention',
-        library: saved,
-        ...(local ? {candidate: local} : {}),
-      });
-    }
-    for (const candidate of candidates.filter(item => candidateRuntime(item) === runtime && !usedPaths.has(resolve(item.modelPath)))) {
-      const matchingCatalog = visibleCatalog.find(entry => entry.profileId === candidate.profile.profile_id);
-      if (matchingCatalog) continue;
-      output.push({
-        id: `candidate:${candidate.profile.profile_id}:${candidate.modelPath}`,
-        section: 'My Models',
-        runtime,
-        title: candidate.profile.model.name,
-        description: candidate.modelPath,
-        status: candidate.complete ? 'Local' : 'Needs attention',
-        candidate,
-      });
-    }
-    return output;
-  }, [candidates, library, runtime, visibleCatalog]);
+      } satisfies ModelRow;
+    });
+  }, [candidates, catalog, library]);
 
-  const selectedIndex = Math.min(selectedByRuntime[runtime], Math.max(rows.length - 1, 0));
-  const selected = rows[selectedIndex];
-  const overrides = selected?.candidate ? modelOverrides[selected.candidate.profile.profile_id] ?? {} : {};
-  const resolved = useMemo(() => resolvedFor(selected?.candidate, overrides), [selected?.candidate, overrides]);
+  const boundedSelectedIndex = Math.min(selectedIndex, Math.max(rows.length - 1, 0));
+  const selected = rows[boundedSelectedIndex];
+  const selectedProfile = useMemo(() => selected?.candidate?.profile
+    ?? profiles.find(profile => profile.profile_id === selected?.catalog?.profileId),
+  [profiles, selected?.candidate?.profile, selected?.catalog?.profileId]);
+  const overrides = selectedProfile ? modelOverrides[selectedProfile.profile_id] ?? {} : {};
+  const resolved = useMemo(() => resolvedFor(selectedProfile, overrides), [selectedProfile, overrides]);
+  const runtime = selected?.runtime ?? 'tess-mlx';
+  const contextPresets = selectedProfile?.expert.context_presets ?? [];
   const settingsFields = useMemo<SettingsField[]>(
     () => ['port', 'alias', 'auth', ...(serverSettings.auth.mode === 'file' ? ['key_file' as const] : [])],
     [serverSettings.auth.mode],
   );
-  const advancedFields = useMemo<AdvancedField[]>(
-    () => selected?.candidate?.kind === 'unprofiled'
-      ? ['context', 'batch', 'ubatch', 'slots', 'flash_attention']
-      : ['context'],
-    [selected?.candidate?.kind],
-  );
 
   useEffect(() => {
-    if (!selected?.candidate || initialContext === undefined) return;
-    const key = selected.candidate.profile.profile_id;
+    if (!selectedProfile || initialContext === undefined) return;
+    if (!selectedProfile.expert.context_presets.some(preset => preset.tokens === initialContext)) return;
+    const key = selectedProfile.profile_id;
     setModelOverrides(current => current[key]?.context !== undefined
       ? current
       : {...current, [key]: {...(current[key] ?? {}), context: initialContext}});
-  }, [initialContext, selected?.candidate]);
+  }, [initialContext, selectedProfile]);
 
   const updateOverride = useCallback((patch: LaunchOverrides) => {
-    if (!selected?.candidate) return;
-    const key = selected.candidate.profile.profile_id;
+    if (!selectedProfile) return;
+    const key = selectedProfile.profile_id;
     setModelOverrides(current => ({...current, [key]: {...(current[key] ?? {}), ...patch}}));
-  }, [selected?.candidate]);
+  }, [selectedProfile]);
+
+  const changeContext = useCallback((direction: number) => {
+    if (!selectedProfile || !resolved || contextPresets.length === 0) return;
+    updateOverride({context: cycle(contextPresets.map(preset => preset.tokens), resolved.context, direction)});
+  }, [contextPresets, resolved, selectedProfile, updateOverride]);
 
   const addCandidate = useCallback(async (candidate: ModelCandidate, catalogEntry?: CatalogEntry) => {
-    const entry = await entryFromCandidate(candidate, catalogEntry);
+    const supportedEntry = catalogEntry ?? catalog.find(entry => entry.profileId === candidate.profile.profile_id);
+    if (!supportedEntry) {
+      throw new Error('Tess Server currently supports only DeepSeek V4 Flash on Tess MLX and Tess-4 35B A3B on GGUF');
+    }
+    const entry = await entryFromCandidate(candidate, supportedEntry);
     const updated = upsertLibraryEntry(library, entry);
     await saveModelLibrary(updated);
     setLibrary(updated);
     setCandidates(current => uniqueCandidates([candidate, ...current]));
-    setRuntime(candidateRuntime(candidate));
-    setSelectedByRuntime(current => ({...current, [candidateRuntime(candidate)]: 0}));
+    setSelectedIndex(Math.max(0, catalog.findIndex(item => item.id === supportedEntry.id)));
     setMessage(candidate.complete
       ? `${candidate.profile.model.name} added. Model files were inspected without content hashing.`
       : `${candidate.profile.model.name} added, but it needs attention: ${candidate.issues.join('; ')}`);
     setView('library');
-  }, [library]);
+  }, [catalog, library]);
 
   const browse = useCallback(async () => {
     setMessage(`Opening the macOS ${runtime === 'tess-mlx' ? 'folder' : 'file'} chooser…`);
@@ -534,26 +494,6 @@ export function App({
     }
   }, [serverSettings, settingsInput]);
 
-  const changeAdvanced = useCallback((direction: number) => {
-    if (!selected?.candidate || !resolved) return;
-    const field = advancedFields[advancedIndex];
-    if (field === 'context') {
-      const values = selected.candidate.kind === 'profiled'
-        ? selected.candidate.profile.expert.context_presets
-          .filter(preset => preset.availability !== 'qualification-pending').map(preset => preset.tokens)
-        : [...genericContextChoices];
-      updateOverride({context: cycle(values, resolved.context, direction)});
-    } else if (field === 'batch') {
-      updateOverride({batch: cycle(genericBatchChoices, resolved.batch, direction)});
-    } else if (field === 'ubatch') {
-      updateOverride({ubatch: cycle(genericUbatchChoices, resolved.ubatch, direction)});
-    } else if (field === 'slots') {
-      updateOverride({slots: cycle(genericSlotChoices, resolved.slots ?? 1, direction)});
-    } else if (field === 'flash_attention') {
-      updateOverride({flashAttention: cycle(genericFlashAttentionChoices, resolved.flashAttention ?? 'auto', direction)});
-    }
-  }, [advancedFields, advancedIndex, resolved, selected?.candidate, updateOverride]);
-
   useInput((input, key) => {
     if (view === 'manual-path') {
       if (key.escape) { setView('library'); setManualPath(''); return; }
@@ -618,45 +558,25 @@ export function App({
       }
       return;
     }
-    if (view === 'advanced') {
-      if (key.escape || input === 'q') { setView('details'); return; }
-      if (key.upArrow) setAdvancedIndex(value => Math.max(0, value - 1));
-      else if (key.downArrow) setAdvancedIndex(value => Math.min(advancedFields.length - 1, value + 1));
-      else if (key.leftArrow) changeAdvanced(-1);
-      else if (key.rightArrow || key.return) changeAdvanced(1);
-      return;
-    }
     if (view === 'details') {
       if (key.escape || input === 'q') { setView('library'); return; }
-      if (input === 'x') { setAdvancedIndex(0); setView('advanced'); return; }
       if (input === 'd' && selected?.catalog && !selected.candidate) { setView('download-confirm'); return; }
-      if (input === 'r' && selected?.library) {
-        const updated = removeLibraryEntry(library, selected.library.id);
-        void saveModelLibrary(updated).then(() => {
-          setLibrary(updated);
-          setMessage('Removed from My Models. No model files were deleted.');
-          setView('library');
-        });
-        return;
-      }
       if (key.return && selected?.candidate) void launch();
       return;
     }
     if (view !== 'library') return;
     if (input === 'q') { exit(); return; }
-    if (key.tab || key.leftArrow || key.rightArrow) {
-      setRuntime(value => value === 'tess-mlx' ? 'gguf' : 'tess-mlx');
-      return;
-    }
-    if (key.upArrow) setSelectedByRuntime(current => ({...current, [runtime]: Math.max(0, selectedIndex - 1)}));
-    else if (key.downArrow) setSelectedByRuntime(current => ({...current, [runtime]: Math.min(rows.length - 1, selectedIndex + 1)}));
-    else if (key.return) selected?.candidate ? void launch() : setView('details');
+    if (key.upArrow) setSelectedIndex(value => Math.max(0, value - 1));
+    else if (key.downArrow) setSelectedIndex(value => Math.min(rows.length - 1, value + 1));
+    else if (key.tab) setSelectedIndex(value => rows.length === 0 ? 0 : (value + 1) % rows.length);
+    else if (key.leftArrow) changeContext(-1);
+    else if (key.rightArrow || input === 'c') changeContext(1);
+    else if (key.return) selected?.candidate ? void launch() : selected?.catalog?.downloadEnabled ? setView('download-confirm') : setView('details');
     else if (input === 'i') setView('details');
     else if (input === 'd' && selected?.catalog && !selected.candidate) setView('download-confirm');
     else if (input === 'b') void browse();
     else if (input === 'a') { setManualPath(''); setView('manual-path'); }
     else if (input === ',') { setSettingsIndex(0); setView('settings'); }
-    else if (input === 'o') setShowOtherMacs(value => !value);
     else if (input === 'r') setRefreshNonce(value => value + 1);
   });
 
@@ -688,28 +608,6 @@ export function App({
     </Box>;
   }
 
-  if (view === 'advanced') {
-    return <Box flexDirection="column">
-      <Brand version={version}/>
-      <Text bold>Advanced · {selected?.title}</Text>
-      <Text dimColor>Recommended defaults are already selected. Change these only when you know the model's limits.</Text>
-      <Box flexDirection="column" borderStyle="round" paddingX={1} marginTop={1}>
-        {advancedFields.map((field, index) => {
-          const value = field === 'context' ? resolved?.context
-            : field === 'batch' ? resolved?.batch
-              : field === 'ubatch' ? resolved?.ubatch
-                : field === 'slots' ? resolved?.slots
-                  : resolved?.flashAttention;
-          return <Text key={field} {...(index === advancedIndex ? {color: 'cyan' as const} : {})}>
-            {index === advancedIndex ? '› ' : '  '}{field.replace('_', ' ')}: {field === 'context' && typeof value === 'number' ? formatTokens(value) : String(value ?? 'default')}
-          </Text>;
-        })}
-      </Box>
-      <Text><Key>↑↓</Key> Select  <Key>←→</Key> Change  <Key>esc</Key> Back</Text>
-      {resolved?.warnings.map(warning => <Text key={warning} color="yellow">Note: {warning}</Text>)}
-    </Box>;
-  }
-
   if (view === 'details') {
     return <Box flexDirection="column">
       <Brand version={version}/>
@@ -729,8 +627,8 @@ export function App({
         {resolved?.rejection && <Text color="red">Needs attention: {resolved.rejection}</Text>}
       </Box>}
       <Text>
-        {selected?.candidate ? <><Key>enter</Key> Launch  <Key>x</Key> Advanced  </> : selected?.catalog?.downloadEnabled ? <><Key>d</Key> Download  </> : null}
-        {selected?.library && <><Key>r</Key> Remove from library  </>}<Key>esc</Key> Back
+        {selected?.candidate ? <><Key>enter</Key> Launch  </> : selected?.catalog?.downloadEnabled ? <><Key>d</Key> Download  </> : null}
+        <Key>esc</Key> Back
       </Text>
       {selected?.catalog?.downloadUnavailableReason && <Text color="yellow">{selected.catalog.downloadUnavailableReason}</Text>}
     </Box>;
@@ -780,6 +678,7 @@ export function App({
         <Text color="cyan">{bar(percent)} {percent === undefined ? '' : `${percent}%`}</Text>
         <Text>{progressLabel(startupProgress, clock)}</Text>
         <Text dimColor>Elapsed {Math.floor((startupProgress?.elapsedMs ?? clock - processStartedAtRef.current) / 1000)}s · model footprint {selected?.candidate ? formatBytes(modelBytes(selected.candidate)) : 'unknown'}</Text>
+        {resolved && <Text>Selected context {formatTokens(resolved.context)}</Text>}
         {capabilities && <Text>Context {formatTokens(capabilities.contextWindow)} · output budget {formatTokens(capabilities.maxOutputTokens)} · {capabilities.slots} slot{capabilities.slots === 1 ? '' : 's'}</Text>}
         {processExit && <Text {...(processStatus === 'failed' ? {color: 'red' as const} : {})}>{processExit}</Text>}
       </Box>
@@ -791,41 +690,47 @@ export function App({
     </Box>;
   }
 
-  let lastSection: ModelRow['section'] | undefined;
   return <Box flexDirection="column">
     <Brand version={version}/>
     <Box justifyContent="space-between">
-      <Box>
-        <Text {...(runtime === 'tess-mlx' ? {color: 'magenta' as const} : {})} bold={runtime === 'tess-mlx'}>[ Tess MLX ]</Text>
-        <Text>  </Text>
-        <Text {...(runtime === 'gguf' ? {color: 'cyan' as const} : {})} bold={runtime === 'gguf'}>[ GGUF ]</Text>
-      </Box>
+      <Text bold>Choose a model and context</Text>
       <Text dimColor>Server stopped · {Math.round(totalmem() / 1024 ** 3)} GiB Mac</Text>
     </Box>
     <Box flexDirection="column" borderStyle="round" borderColor={runtimeColor(runtime)} paddingX={1} marginTop={1}>
-      {rows.length === 0 && <Text dimColor>No {runtimeName(runtime)} models to show.</Text>}
+      <Text bold>Model</Text>
       {rows.map((row, index) => {
-        const heading = row.section !== lastSection;
-        lastSection = row.section;
-        return <React.Fragment key={row.id}>
-          {heading && <Text bold {...(row.section === 'Recommended' ? {color: 'yellow' as const} : {})}>{row.section}</Text>}
-          <Box>
-            <Text {...(index === selectedIndex ? {color: runtimeColor(runtime)} : {})} bold={index === selectedIndex}>{index === selectedIndex ? '› ' : '  '}</Text>
-            <Box width={34}><Text bold={index === selectedIndex} wrap="truncate">{row.title}</Text></Box>
-            <Box width={12}><Text color={runtimeColor(runtime)}>{runtimeName(runtime)}</Text></Box>
-            <Box width={13}><Text>{row.candidate ? formatBytes(modelBytes(row.candidate)) : row.catalog ? formatBytes(row.catalog.diskBytes) : '—'}</Text></Box>
-            <Text color={statusColor(row.status)}>{row.status}</Text>
-          </Box>
-        </React.Fragment>;
+        const active = index === boundedSelectedIndex;
+        return <Box key={row.id}>
+          <Text {...(active ? {color: runtimeColor(row.runtime)} : {})} bold={active}>{active ? '› ' : '  '}</Text>
+          <Box width={34}><Text bold={active} wrap="truncate">{row.title}</Text></Box>
+          <Box width={12}><Text color={runtimeColor(row.runtime)}>{runtimeName(row.runtime)}</Text></Box>
+          <Box width={13}><Text>{row.candidate ? formatBytes(modelBytes(row.candidate)) : row.catalog ? formatBytes(row.catalog.diskBytes) : '—'}</Text></Box>
+          <Text color={statusColor(row.status)}>{row.status}</Text>
+        </Box>;
       })}
+      <Text> </Text>
+      <Text bold>Context length</Text>
+      <Box>
+        {contextPresets.map(preset => {
+          const active = preset.tokens === resolved?.context;
+          return <React.Fragment key={preset.tokens}>
+            <Text {...(active ? {color: runtimeColor(runtime), bold: true} : {})}>[{active ? '› ' : '  '}{preset.label}]</Text>
+            <Text> </Text>
+          </React.Fragment>;
+        })}
+      </Box>
+      <Text dimColor>{selected?.description}</Text>
+      {resolved && resolved.context > (selectedProfile?.context.default ?? resolved.context)
+        && <Text dimColor>Larger contexts use more memory.</Text>}
+      {selected?.candidate?.issues.map(issue => <Text key={issue} color="red">Needs attention: {issue}</Text>)}
     </Box>
-    <Text dimColor>{scanning ? 'Scanning local model folders… ' : ''}{message}</Text>
+    <Text dimColor>{scanning ? 'Scanning for the two supported models… ' : ''}{message}</Text>
     <Text>
-      <Key>tab/←→</Key> Runtime  <Key>↑↓</Key> Select  <Key>enter</Key> {selected?.candidate ? 'Launch' : 'Details'}  <Key>i</Key> Info
+      <Key>↑↓</Key> Model  <Key>←→</Key> Context  <Key>enter</Key> {selected?.candidate ? 'Launch' : 'Download'}
     </Text>
     <Text>
-      {selected?.catalog?.downloadEnabled && !selected.candidate && <><Key>d</Key> Download  </>}<Key>b</Key> Browse  <Key>a</Key> Add path  <Key>,</Key> Settings  <Key>r</Key> Rescan  <Key>o</Key> {showOtherMacs ? 'Fit this Mac' : 'Other Macs'}  <Key>q</Key> Quit
+      <Key>b</Key> Locate model  <Key>,</Key> Settings  <Key>r</Key> Rescan  <Key>q</Key> Quit
     </Text>
-    <Text dimColor>Catalog is bundled and offline · host catalog filter {hostMemoryGiB().toFixed(0)} GiB</Text>
+    <Text dimColor>No network access unless you confirm a download.</Text>
   </Box>;
 }

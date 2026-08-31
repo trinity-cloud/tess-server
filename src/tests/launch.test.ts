@@ -82,6 +82,22 @@ test('routes the MLX profile through its packaged Tess MLX target-only runtime',
   assert.equal(targetOnlySpec.env.PMIN, undefined);
 });
 
+test('forwards every product context choice to both runtimes', () => {
+  const contexts = [32768, 65536, 131072, 262144, 524288, 1048576];
+  const mlxProfile = {...profile, profile_id: 'dsv4-0731-mlx-24mixed'} as ProfileDescriptor;
+  const mlx: ModelCandidate = {
+    kind: 'profiled', profile: mlxProfile, modelPath: '/models/deepseek-mlx', complete: true, issues: [],
+  };
+  for (const context of contexts) {
+    assert.equal(serveSpec('/payload', mlx, {context}).env.CTX, String(context));
+  }
+
+  for (const context of contexts.slice(0, -1)) {
+    assert.equal(serveSpec('/payload', candidate, {context}).env.CTX, String(context));
+  }
+  assert.equal(serveSpec('/payload', candidate, {context: 1010000}).env.CTX, '1010000');
+});
+
 test('builds a configurable generic GGUF launcher with detected companions', () => {
   const genericProfile = {
     ...profile,
